@@ -1,5 +1,2 @@
-unless Gem::Specification.all_names.any?{|gem| gem =~ /rubyzip/}
-  gem 'rubyzip'
-end
-
+gem 'rubyzip' unless Bundler.rubygems.find_name('rubyzip').any?
 gem 'zlib'
