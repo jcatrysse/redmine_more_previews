@@ -180,13 +180,13 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
       log_user('jsmith', 'jsmith')
       get "/attachments/more_preview/#{attachment.id}/index.html"
       assert_response :success
-      assert_match /\Asandbox\b/, response.headers['Content-Security-Policy']
+      assert_match /(\A|;\s*)sandbox\b/, response.headers['Content-Security-Policy']
       assert_not_include 'allow-scripts', response.headers['Content-Security-Policy']
       assert_not_include 'allow-same-origin', response.headers['Content-Security-Policy']
       assert_equal 'nosniff', response.headers['X-Content-Type-Options']
       get "/attachments/more_preview/#{zip.id}/top.txt"
       assert_response :success
-      assert_match /\Asandbox\b/, response.headers['Content-Security-Policy']
+      assert_match /(\A|;\s*)sandbox\b/, response.headers['Content-Security-Policy']
     end
   end
 
@@ -223,6 +223,17 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
       get "/attachments/#{attachment.id}"
       assert_response :success
       assert_select '#preview_repository_entry_top + div h1', :text => 'Textile sample'
+    end
+  end
+
+  def test_mail_with_one_cc_shows_the_cc
+    mail = File.read(File.join(FILES, 'sample.eml')).sub("To: Bob Example <bob@example.net>\n", "To: Bob Example <bob@example.net>\nCc: carol@example.net\n")
+    attachment = preview_attachment(@issue, 'cc.eml', mail)
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get "/attachments/#{attachment.id}"
+      assert_response :success
+      assert_select '#preview_repository_entry_top .box td', :text => 'carol@example.net'
     end
   end
 

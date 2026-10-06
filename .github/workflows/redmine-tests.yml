@@ -54,7 +54,8 @@ jobs:
           ruby-version: ${{ steps.ruby.outputs.version }}
 
       - name: System libraries
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libpq-dev default-libmysqlclient-dev
+        # pandoc: the mark converter, used by the plugin's tests
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libpq-dev default-libmysqlclient-dev pandoc
 
       - name: Start ${{ inputs.db }}
         run: ./.codex/start_database.sh "${{ inputs.db }}"
@@ -72,6 +73,10 @@ jobs:
         if: ${{ inputs.e2e }}
         with:
           node-version: 22
+
+      - name: Converter programs for the browser checks
+        if: ${{ inputs.e2e }}
+        run: sudo apt-get install -y -qq libreoffice-writer libreoffice-calc imagemagick ghostscript
 
       - name: Playwright with Chromium
         if: ${{ inputs.e2e }}
