@@ -154,13 +154,21 @@ module RedmineMorePreviews
           
           # directory of this preview
           def preview_storagepath
-            File.join(previews_storagepath, identifier.to_s)
+            # the id: identifiers repeat across projects (and are empty for default repositories)
+            File.join(previews_storagepath, id.to_s)
+          end #def
+          
+          # the revision the entry was last changed in, so a new commit gets a new preview
+          def preview_revision(path, rev)
+            revision = entry(path, rev)&.lastrev&.identifier.presence ||
+                       latest_changesets(path, rev, 1).first&.identifier.presence || rev.presence || "default"
+            revision.to_s.gsub(/[^0-9A-Za-z._-]/, "_")
           end #def
           
           # directory containing all preview files and assets
           def preview_dirname(path, rev, options={})
             format = options[:format].presence || preview_format(path, rev).presence
-            File.join(preview_storagepath, path, ["preview", format ].compact.join("."))
+            File.join(preview_storagepath, preview_revision(path, rev), path, ["preview", format ].compact.join("."))
           end #def
           
           #

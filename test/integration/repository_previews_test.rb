@@ -86,6 +86,44 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  def test_previews_of_two_repositories_with_the_same_identifier_are_kept_apart
+    other_dir = Dir.mktmpdir('rmp-repo')
+    FileUtils.mkdir_p(File.join(other_dir, 'docs'))
+    File.write(File.join(other_dir, 'docs', 'sample.txt'), "Secret of the other project\n")
+    git = ->(*args) { system('git', '-C', other_dir, *args, exception: true, out: File::NULL, err: File::NULL) }
+    git.call('init', '-q', '-b', 'main')
+    git.call('add', '.')
+    git.call('-c', 'user.name=Test', '-c', 'user.email=test@example.net', 'commit', '-q', '-m', 'other')
+    other = Project.find(2) # jsmith is a manager there too
+    enable_previews(other)
+    other.repositories.destroy_all
+    Repository::Git.create!(:project => other, :url => File.join(other_dir, '.git'), :identifier => 'samples', :is_default => true).fetch_changesets
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get '/projects/onlinestore/repository/samples/preview/docs/sample.txt@/index.txt'
+      assert_include 'Secret of the other project', response.body
+      get '/projects/ecookbook/repository/samples/preview/docs/sample.txt@/index.txt'
+      assert_response :success
+      assert_include 'Plain text sample', response.body
+      assert_not_include 'Secret', response.body
+    end
+  ensure
+    FileUtils.rm_rf(other_dir) if other_dir
+  end
+
+  def test_a_new_commit_gets_a_new_preview
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get '/projects/ecookbook/repository/samples/preview/docs/sample.txt@/index.txt'
+      assert_include 'Plain text sample', response.body
+      File.write(File.join(@dir, 'docs', 'sample.txt'), "Changed text\n")
+      system('git', '-C', @dir, '-c', 'user.name=Test', '-c', 'user.email=test@example.net', 'commit', '-q', '-am', 'change', exception: true)
+      @repository.fetch_changesets
+      get '/projects/ecookbook/repository/samples/preview/docs/sample.txt@/index.txt'
+      assert_include 'Changed text', response.body
+    end
+  end
+
   def test_entry_falls_back_to_core_when_the_module_is_disabled
     @project.enabled_module_names = @project.enabled_module_names - ['redmine_more_previews']
     with_converters(CONVERTERS) do
