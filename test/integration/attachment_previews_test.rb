@@ -71,6 +71,16 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  def test_more_preview_without_format_is_404
+    attachment = preview_attachment(@issue, 'sample.txt')
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      # the plugin always links a format; without one the file came back as application/octet-stream
+      get "/attachments/more_preview/#{attachment.id}/index"
+      assert_response :not_found
+    end
+  end
+
   def test_more_preview_of_a_file_without_converter_is_404
     attachment = preview_attachment(@issue, 'sample.csv')
     with_converters(CONVERTERS) do

@@ -56,6 +56,8 @@ module RedmineMorePreviews
                 respond_to do |format|
                   format.any { send_more_asset }
                 end #respond
+              elsif params[:format].blank? # the plugin always links the preview with its format
+                render_404
               else
                 respond_to do |format|
                   format.html  { send_more_preview }
