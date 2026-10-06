@@ -27,7 +27,8 @@ await probe(`/projects/e2e-project/repository/samples/preview/sample.zip@/index.
 await probe(`/attachments/more_preview/999999/index.html`, 404);
 
 // the refusal itself has no body (404 for a non-HTML format), so show the probe results
-await t.go(`/attachments/more_preview/${att['sample.txt']}/index.txt?asset=${up}etc/passwd`, { status: 404 });
+await t.go(`/attachments/more_preview/${att['sample.txt']}/index.txt?asset=${up}etc/passwd`, { status: 404 })
+  .catch(e => t.problems.push(`traversal in the browser: ${String(e.message).split('\n')[0]} (the file is served)`));
 const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 await t.page.setContent(`<h2>Path traversal probes as reporter</h2><p>HTTP status and URL; "LEAK" would mark a response carrying the file.</p><pre>${esc(rows.join('\n'))}</pre>`);
 await t.shot('traversal-404', 'Assets outside the preview directory are refused with 404 (before this branch /etc/passwd and config/database.yml came back with 200)', { full: false });

@@ -46,7 +46,8 @@ for (const [name, format, type, needle, caption, allow] of cases) {
     const csp = res.headers()['content-security-policy'] || '';
     if (type === 'application/pdf' ? csp : !csp.startsWith('sandbox')) t.problems.push(`${name}: unexpected CSP "${csp}"`);
   } else {
-    const text = await t.page.locator('#preview_repository_entry_top + div').innerText();
+    const inline = t.page.locator('#preview_repository_entry_top + div');
+    const text = (await inline.count()) ? await inline.innerText() : '';
     if (!/Textile sample|hello\.txt/.test(text)) t.problems.push(`${name}: inline preview is empty`);
   }
   await t.page.waitForTimeout(1500); // the embedded document
