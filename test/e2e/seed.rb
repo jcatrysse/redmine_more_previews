@@ -72,7 +72,9 @@ unless File.directory?(File.join(repo_dir, '.git'))
 end
 project.enabled_module_names = (project.enabled_module_names | ['repository'])
 repository = project.repositories.find_by(identifier: 'samples') ||
-             Repository::Git.create!(project: project, identifier: 'samples', url: repo_dir, is_default: true)
+             Repository::Git.new(project: project, identifier: 'samples', is_default: true)
+repository.url = File.join(repo_dir, '.git') # git wants the .git directory of a working copy
+repository.save!
 repository.fetch_changesets
 
 puts "Plugin seed: #{issue.attachments.count} sample attachments on issue ##{issue.id}, " \

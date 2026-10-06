@@ -128,6 +128,8 @@ module RedmineMorePreviews
           def find_asset_param
             @asset = params[:asset].is_a?(Array) ? params[:asset].join('/') : params[:asset]
             @asset = [@asset, params[:assetformat]].compact.join(".").presence
+            # an asset is a file in the preview directory, never outside of it
+            render_404 if @asset && !RedmineMorePreviews::Lib::RmpFile.safe_relative_path?(@asset)
           end #def
           private :find_asset_param
         end #base

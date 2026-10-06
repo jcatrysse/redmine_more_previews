@@ -144,6 +144,18 @@ module RedmineMorePreviews
         end #def
         
         #-----------------------------------------------------------------------------------
+        # safe_relative_path?(path)
+        # true if path is relative and stays below the directory it is joined to:
+        # not empty, not absolute, no ".." segment, no NUL byte
+        #-----------------------------------------------------------------------------------
+        def safe_relative_path?( path )
+          path = path.to_s
+          return false if path.empty? || path.include?("\0")
+          return false if path.start_with?("/", "\\") || path =~ /\A[a-zA-Z]:/
+          path.split(/[\/\\]/).none? { |segment| segment == ".." }
+        end #def
+        
+        #-----------------------------------------------------------------------------------
         # get directory, if it does not exist, create directory
         #-----------------------------------------------------------------------------------
         def directory( subdir, dir=nil )

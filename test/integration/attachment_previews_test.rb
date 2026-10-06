@@ -147,6 +147,22 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  def test_asset_outside_the_preview_directory_is_refused
+    attachment = preview_attachment(@issue, 'sample.txt')
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      secret = Rails.root.join('config', 'database.yml').relative_path_from(Pathname.new(attachment.preview_dirname))
+      get "/attachments/more_preview/#{attachment.id}/index.txt", :params => { :asset => secret.to_s }
+      assert_response :not_found
+      assert_not_include 'adapter', response.body
+      get "/attachments/more_preview/#{attachment.id}/index.txt", :params => { :asset => '/etc/passwd' }
+      assert_response :not_found
+      get "/attachments/more_preview/#{attachment.id}/#{secret.to_s.delete_suffix('.yml')}.yml"
+      assert_response :not_found
+      assert_not_include 'adapter', response.body
+    end
+  end
+
   def test_admin_info_lists_the_converter_checks
     with_converters(CONVERTERS) do
       log_user('admin', 'admin')

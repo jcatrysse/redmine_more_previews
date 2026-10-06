@@ -113,6 +113,7 @@ module RedmineMorePreviews
       # should preview asset be served instead of preview
       self.assets         = options[:assets].presence
       self.asset          = options[:asset].presence
+      raise ConverterBadArgument if asset && !RmpFile.safe_relative_path?(asset)
       
       # should cache be renewed
        self.reload        = options[:reload].presence || false

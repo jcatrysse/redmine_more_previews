@@ -128,6 +128,8 @@ module RedmineMorePreviews
             @path  = [@path, params[:baseformat]].compact.join(".")
             @asset = params[:asset].is_a?(Array) ? params[:asset].join('/') : params[:asset]
             @asset = [@asset, params[:assetformat]].compact.join(".")
+            # an asset is a file in the preview directory, never outside of it
+            render_404 if @asset.present? && !RedmineMorePreviews::Lib::RmpFile.safe_relative_path?(@asset)
           end #def
           private :find_path_param
           
@@ -154,7 +156,8 @@ module RedmineMorePreviews
             end
             
             if params[:asset]
-              find_path_param; @disposition = "attachment"
+              find_path_param; return if performed?
+              @disposition = "attachment"
               respond_to do |format|
                 format.any { send_more_asset }
               end #respond

@@ -20,4 +20,17 @@ class RmpFileTest < ActiveSupport::TestCase
       assert_nil RmpFile.directory('../escape', dir)
     end
   end
+
+  def test_safe_relative_path
+    assert RmpFile.safe_relative_path?('top.txt')
+    assert RmpFile.safe_relative_path?('inner/hello.txt')
+    assert RmpFile.safe_relative_path?('a..b.txt')
+    assert_not RmpFile.safe_relative_path?('../config/database.yml')
+    assert_not RmpFile.safe_relative_path?('inner/../../x')
+    assert_not RmpFile.safe_relative_path?('..\\x')
+    assert_not RmpFile.safe_relative_path?('/etc/passwd')
+    assert_not RmpFile.safe_relative_path?('C:/windows')
+    assert_not RmpFile.safe_relative_path?("a\0b")
+    assert_not RmpFile.safe_relative_path?('')
+  end
 end
