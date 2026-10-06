@@ -88,6 +88,7 @@ module RedmineMorePreviews
           #
           ################################################################################
           def send_more_preview
+            sandbox_preview Rack::Mime.mime_type(".#{params[:format]}")
             if !params[:unsafe] && RedmineMorePreviews::Converter.cache_previews?
               if params[:reload] || stale?(:etag => @attachment.preview_mtime(preview_params))
                 send_data @attachment.more_preview(preview_params),
@@ -107,6 +108,7 @@ module RedmineMorePreviews
           private :send_more_preview
           
           def send_more_asset
+            sandbox_preview Rack::Mime.mime_type( File.extname(@asset) )
             if !params[:unsafe] && RedmineMorePreviews::Converter.cache_previews?
               if params[:reload] || stale?(:etag => @attachment.asset_mtime(preview_params))
                 send_data @attachment.more_asset(preview_params),

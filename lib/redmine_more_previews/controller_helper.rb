@@ -32,5 +32,15 @@ module RedmineMorePreviews
     end #def
     private :preview_params
     
+    # Previews and assets are converted user files served from Redmine's origin.
+    # Sandbox them, so that a script in a converted html, svg or mail cannot act
+    # in the user's Redmine session. Chrome does not render a PDF in a sandbox.
+    def sandbox_preview(type)
+      response.headers['X-Content-Type-Options'] = 'nosniff'
+      return if type.to_s == 'application/pdf'
+      response.headers['Content-Security-Policy'] = 'sandbox allow-downloads allow-popups allow-popups-to-escape-sandbox'
+    end #def
+    private :sandbox_preview
+    
   end #module
 end #module

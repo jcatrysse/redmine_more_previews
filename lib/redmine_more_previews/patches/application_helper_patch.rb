@@ -23,10 +23,20 @@
 module RedmineMorePreviews
   module Patches 
     module ApplicationHelperPatch
+      INLINE_TAGS = %w(table thead tbody tfoot tr th td caption colgroup col s u figure figcaption section article header footer)
+      
       def self.included(base)
         base.class_eval do
         
           #unloadable 
+          
+          # inline previews are converted user files rendered into the page itself
+          def more_previews_inline(html)
+            sanitize(RedmineMorePreviews::Lib::RmpText.to_utf8(html.to_s),
+              :tags       => Rails::HTML5::SafeListSanitizer.allowed_tags.to_a + RedmineMorePreviews::Patches::ApplicationHelperPatch::INLINE_TAGS,
+              :attributes => Rails::HTML5::SafeListSanitizer.allowed_attributes.to_a + %w(colspan rowspan align download style)
+            )
+          end #def
           
           def more_previews_tag(path, filename, options={})
           

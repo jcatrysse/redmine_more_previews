@@ -33,10 +33,10 @@
     </div>
     <div>
     <% if RedmineMorePreviews::Converter.cache_previews? %>
-      <%= @repository.more_preview( @path, @rev, request.query_parameters.merge(:format => "inline", :request => request).symbolize_keys ).to_s.to_utf8.html_safe %>
+      <%= more_previews_inline @repository.more_preview( @path, @rev, request.query_parameters.merge(:format => "inline", :request => request).symbolize_keys ) %>
     <% else %>
       <%  @repository.more_preview( @path, @rev, request.query_parameters.merge(:format => "inline", :request => request).symbolize_keys ) do |html| %>
-        <%= html.to_s.to_utf8.html_safe %>
+        <%= more_previews_inline html %>
       <% end %>
     <% end %>
     </div>

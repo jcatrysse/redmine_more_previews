@@ -163,6 +163,49 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  def test_html_previews_and_assets_are_sandboxed
+    attachment = preview_attachment(@issue, 'sample.html')
+    zip = preview_attachment(@issue, 'sample.zip')
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get "/attachments/more_preview/#{attachment.id}/index.html"
+      assert_response :success
+      assert_match /\Asandbox\b/, response.headers['Content-Security-Policy']
+      assert_not_include 'allow-scripts', response.headers['Content-Security-Policy']
+      assert_not_include 'allow-same-origin', response.headers['Content-Security-Policy']
+      assert_equal 'nosniff', response.headers['X-Content-Type-Options']
+      get "/attachments/more_preview/#{zip.id}/top.txt"
+      assert_response :success
+      assert_match /\Asandbox\b/, response.headers['Content-Security-Policy']
+    end
+  end
+
+  def test_pdf_previews_are_not_sandboxed
+    # Chrome does not render a PDF in a sandboxed document
+    attachment = preview_attachment(@issue, 'sample.pdf')
+    with_converters(:peek => { :pdf => :pdf }) do
+      log_user('jsmith', 'jsmith')
+      get "/attachments/more_preview/#{attachment.id}/index.pdf"
+      assert_response :success
+      assert_equal 'application/pdf', response.media_type
+      assert_nil response.headers['Content-Security-Policy']
+    end
+  end
+
+  def test_inline_previews_are_sanitized
+    attachment = preview_attachment(@issue, 'evil.md', "# Title\n\n<script>alert(1)</script>\n\n<img src=\"x\" onerror=\"alert(2)\">\n\n| a | b |\n|---|---|\n| 1 | 2 |\n")
+    with_converters(:mark => { :md => :inline }) do
+      log_user('jsmith', 'jsmith')
+      get "/attachments/#{attachment.id}"
+      assert_response :success
+      assert_select '#preview_repository_entry_top + div h1', :text => 'Title'
+      assert_select '#preview_repository_entry_top + div table td', :text => '2'
+      assert_select '#preview_repository_entry_top + div script', 0
+      assert_select '#preview_repository_entry_top + div img[onerror]', 0
+      assert_not_include '<script>alert(1)', response.body
+    end
+  end
+
   def test_textile_inline_preview
     attachment = preview_attachment(@issue, 'sample.textile')
     with_converters(CONVERTERS) do
@@ -170,6 +213,45 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
       get "/attachments/#{attachment.id}"
       assert_response :success
       assert_select '#preview_repository_entry_top + div h1', :text => 'Textile sample'
+    end
+  end
+
+  def test_plain_text_mail_body_is_escaped
+    mail = File.read(File.join(FILES, 'sample.eml')).sub('this is the body', '<b>bold</b> <script>alert(1)</script> this is the body')
+    attachment = preview_attachment(@issue, 'tags.eml', mail)
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get "/attachments/more_preview/#{attachment.id}/index.html"
+      assert_response :success
+      assert_include '&lt;b&gt;bold&lt;/b&gt;', response.body
+      assert_not_include '<script>', response.body
+    end
+  end
+
+  def test_mail_headers_are_escaped_on_the_preview_page
+    mail = File.read(File.join(FILES, 'sample.eml')).sub('Subject: Sample mail for the preview', 'Subject: <img src="x" onerror="alert(1)"> hello')
+    attachment = preview_attachment(@issue, 'subject.eml', mail)
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get "/attachments/#{attachment.id}"
+      assert_response :success
+      assert_select 'img[onerror]', 0
+      assert_include '&lt;img src="x" onerror="alert(1)"&gt; hello', response.body
+    end
+  end
+
+  def test_zip_folder_names_are_escaped
+    zip = Zip::OutputStream.write_buffer do |out|
+      out.put_next_entry('<img src=x onerror=alert(1)>/')
+      out.put_next_entry('<img src=x onerror=alert(1)>/a.txt')
+      out.write 'a'
+    end.string
+    attachment = preview_attachment(@issue, 'names.zip', zip)
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get "/attachments/more_preview/#{attachment.id}/index.html"
+      assert_response :success
+      assert_not_include '<img', response.body
     end
   end
 
