@@ -22,6 +22,7 @@
 
 jp:
   label_redmine_more_previews:                             "Redmine More Previews"
+  project_module_redmine_more_previews:                    "Redmine More Previews"
   
   label_redmine_more_previews_global_settings:             "グローバル設定"
   
