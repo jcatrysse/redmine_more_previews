@@ -96,8 +96,19 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
     end
   end
 
-  def test_more_preview_needs_view_changesets
+  def test_more_preview_is_allowed_with_browse_repository_alone
+    # entry needs browse_repository; its preview frame must not need more
     Role.find(1).remove_permission!(:view_changesets)
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get '/projects/ecookbook/repository/samples/preview/docs/sample.txt@/index.txt'
+      assert_response :success
+    end
+  end
+
+  def test_more_preview_needs_a_repository_permission
+    Role.find(1).remove_permission!(:view_changesets)
+    Role.find(1).remove_permission!(:browse_repository)
     with_converters(CONVERTERS) do
       log_user('jsmith', 'jsmith')
       get '/projects/ecookbook/repository/samples/preview/docs/sample.txt@/index.txt'
