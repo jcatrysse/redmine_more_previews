@@ -77,5 +77,8 @@ repository.url = repository.root_url = File.join(repo_dir, '.git') # git wants t
 repository.save!
 repository.fetch_changesets
 
+# for scenarios that upload through the REST API
+File.write(Rails.root.join('tmp', 'e2e-manager-api-key'), User.find_by!(login: 'manager').api_key)
+
 puts "Plugin seed: #{issue.attachments.count} sample attachments on issue ##{issue.id}, " \
      "private issue ##{private_issue.id}, repository #{repository.identifier} (#{repository.changesets.count} changeset)"
