@@ -1,0 +1,9 @@
+BEGIN:VCARD
+VERSION:3.0
+N:Doe;John;;;
+FN:John Doe
+ORG:Example Ltd.
+TITLE:Engineer
+TEL;TYPE=WORK,VOICE:+32 9 123 45 67
+EMAIL;TYPE=PREF,INTERNET:john.doe@example.net
+END:VCARD
