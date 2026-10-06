@@ -255,6 +255,19 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  def test_preview_page_does_not_use_the_removed_jquery_load_handler
+    attachment = preview_attachment(@issue, 'sample.txt')
+    with_converters(CONVERTERS, 'embedding' => '1') do # iframe
+      log_user('jsmith', 'jsmith')
+      get "/attachments/#{attachment.id}"
+      assert_response :success
+      assert_select 'iframe#preview_frame'
+      # jQuery 3 removed .load(handler): "e.indexOf is not a function" on every preview page
+      assert_not_include ".load(function", response.body
+      assert_include "$('#preview_frame').on('load', function", response.body
+    end
+  end
+
   def test_admin_info_lists_the_converter_checks
     with_converters(CONVERTERS) do
       log_user('admin', 'admin')

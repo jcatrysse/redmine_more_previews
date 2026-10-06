@@ -21,7 +21,7 @@
 
 <div>
   <p class="contextual">
-    <%= link_to l(:button_update), reloadpath, :class => "icon icon-reload" %>
+    <%= link_to more_previews_icon('reload', l(:button_update)), reloadpath, :class => "icon icon-reload" %>
     <%= call_hook(:preview_repository_entry_contextual, :repository => @repository, :path => @path, :rev => @rev, :entry => @entry, :project => @project ) %>
   </p>
 </div><div style="clear:both;"></div>
@@ -60,7 +60,7 @@
   <%- else %>
     <script type="text/javascript">
       $( document ).ready(function() {
-        $('#preview_frame').load(function() {
+        $('#preview_frame').on('load', function() {
             $('#ajax-indicator').hide();
         });
       });
