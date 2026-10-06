@@ -283,6 +283,20 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  def test_zip_links_to_files_in_folders_are_encoded_once
+    attachment = preview_attachment(@issue, 'sample.zip')
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get "/attachments/more_preview/#{attachment.id}/index.html"
+      assert_response :success
+      href = css_select('a[download="hello.txt"]').first['href']
+      assert_equal "/attachments/more_preview/#{attachment.id}/index.html?asset=inner%2Fhello.txt", href
+      get href
+      assert_response :success
+      assert_equal "hello inner\n", response.body
+    end
+  end
+
   def test_admin_info_lists_the_converter_checks
     with_converters(CONVERTERS) do
       log_user('admin', 'admin')
