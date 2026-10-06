@@ -163,6 +163,16 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  def test_textile_inline_preview
+    attachment = preview_attachment(@issue, 'sample.textile')
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get "/attachments/#{attachment.id}"
+      assert_response :success
+      assert_select '#preview_repository_entry_top + div h1', :text => 'Textile sample'
+    end
+  end
+
   def test_admin_info_lists_the_converter_checks
     with_converters(CONVERTERS) do
       log_user('admin', 'admin')

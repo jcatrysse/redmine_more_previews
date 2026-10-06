@@ -31,7 +31,7 @@ class Mark < RedmineMorePreviews::Conversion
   # constants
   #---------------------------------------------------------------------------------
   PANDOC_BIN = 'pandoc'.freeze
-  PANDOC_FRM = {"text/markdown" => "markdown", "text/html" => "html"}
+  PANDOC_FRM = {"text/markdown" => "markdown", "text/x-web-textile" => "textile", "text/html" => "html"}
   
   #---------------------------------------------------------------------------------
   # check: is Pandoc available?
