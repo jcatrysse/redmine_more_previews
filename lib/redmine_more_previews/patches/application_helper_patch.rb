@@ -38,8 +38,8 @@ module RedmineMorePreviews
           # inline previews are converted user files rendered into the page itself
           def more_previews_inline(html)
             sanitize(RedmineMorePreviews::Lib::RmpText.to_utf8(html.to_s),
-              :tags       => Rails::HTML5::SafeListSanitizer.allowed_tags.to_a + RedmineMorePreviews::Patches::ApplicationHelperPatch::INLINE_TAGS,
-              :attributes => Rails::HTML5::SafeListSanitizer.allowed_attributes.to_a + %w(colspan rowspan align download style)
+              :tags       => ActionView::Base.sanitized_allowed_tags.to_a + RedmineMorePreviews::Patches::ApplicationHelperPatch::INLINE_TAGS,
+              :attributes => ActionView::Base.sanitized_allowed_attributes.to_a + %w(colspan rowspan align download style)
             )
           end #def
           

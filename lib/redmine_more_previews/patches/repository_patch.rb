@@ -160,9 +160,12 @@ module RedmineMorePreviews
           
           # the revision the entry was last changed in, so a new commit gets a new preview
           def preview_revision(path, rev)
-            revision = entry(path, rev)&.lastrev&.identifier.presence ||
-                       latest_changesets(path, rev, 1).first&.identifier.presence || rev.presence || "default"
-            revision.to_s.gsub(/[^0-9A-Za-z._-]/, "_")
+            @preview_revisions ||= {}
+            @preview_revisions[[path, rev]] ||= begin
+              revision = entry(path, rev)&.lastrev&.identifier.presence ||
+                         latest_changesets(path, rev, 1).first&.identifier.presence || rev.presence || "default"
+              revision.to_s.gsub(/[^0-9A-Za-z._-]/, "_")
+            end
           end #def
           
           # directory containing all preview files and assets
