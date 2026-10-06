@@ -268,6 +268,21 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  def test_preview_page_icons
+    attachment = preview_attachment(@issue, 'sample.eml')
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get "/attachments/#{attachment.id}"
+      assert_response :success
+      if Redmine::VERSION::MAJOR >= 6 # SVG sprite icons replaced the icon-* CSS
+        assert_select 'a.icon-reload svg use[href*=?]', 'icon--reload'
+        assert_select 'a.icon-warning svg use[href*=?]', 'icon--warning'
+      else
+        assert_select 'a.icon-reload', :text => I18n.t(:button_update)
+      end
+    end
+  end
+
   def test_admin_info_lists_the_converter_checks
     with_converters(CONVERTERS) do
       log_user('admin', 'admin')
