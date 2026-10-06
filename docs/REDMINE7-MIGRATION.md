@@ -121,6 +121,7 @@ These GEOxyz commits are on the branch GEOxyz runs today and therefore on this b
 | 7.0-stable-GEOxyz (7.0.1), Ruby 3.3.6, Rails 8.1.3.1, at `c19f76f` | PostgreSQL 16.15 | 46 runs, 375 assertions, 0 failures, 0 errors, 0 skips |
 | 7.0-stable-GEOxyz, at `c19f76f` | MariaDB 10.11.14 | 46 runs, 375 assertions, 0 failures, 0 errors, 0 skips |
 | 7.0-stable-GEOxyz + redmine_drawio, view_customize, redmine_wiki_extensions (redmine70-migration) | MariaDB 10.11 | 47 runs, 381 assertions, 0 failures, 0 errors, 0 skips (final test set, `38bc789`: + the Cc test from the review) |
+| 7.0-stable-GEOxyz, final test set at `abdc217` | PostgreSQL 16.15 | 47 runs, 381 assertions, 0 failures, 0 errors, 0 skips |
 | 5.1-stable, Ruby 3.2.6, at `c19f76f` | PostgreSQL 16 | 46 runs, 361 assertions, 0 failures, 0 errors, 0 skips |
 
 Boot and production eager load: OK (the e2e server runs in production mode). Migrations: the plugin
