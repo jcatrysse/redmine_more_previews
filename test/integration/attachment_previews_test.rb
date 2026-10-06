@@ -297,6 +297,17 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  def test_vcard_preview_links_only_existing_stylesheets
+    attachment = preview_attachment(@issue, 'sample.vcf')
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get "/attachments/more_preview/#{attachment.id}/index.html"
+      assert_response :success
+      assert_not_include 'jquery-ui-1.11.0', response.body
+      assert_not_include 'tribute-3.7.3', response.body
+    end
+  end
+
   def test_admin_info_lists_the_converter_checks
     with_converters(CONVERTERS) do
       log_user('admin', 'admin')
