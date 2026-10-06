@@ -50,6 +50,10 @@ rmp_select_ruby install
 
 SUDO=""
 [ "$(id -u)" = 0 ] || SUDO=sudo
+# As root there is no sudo prefix, and "-u postgres psql" alone is no command.
+as_postgres() {
+  if [ "$(id -u)" = 0 ]; then runuser -u postgres -- "$@"; else sudo -u postgres "$@"; fi
+}
 
 if [ "$RMP_PROVISION_DB" = 1 ]; then
   echo "Provisioning a local $RMP_ENGINE server (set RMP_PROVISION_DB=0 to skip)."
@@ -57,8 +61,8 @@ if [ "$RMP_PROVISION_DB" = 1 ]; then
   if [ "$RMP_ENGINE" = postgresql ]; then
     $SUDO apt-get install -y -qq build-essential libpq-dev postgresql postgresql-contrib
     $SUDO service postgresql start
-    $SUDO -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$RMP_DB_USER'" | grep -q 1 ||
-      $SUDO -u postgres psql -c "CREATE ROLE $RMP_DB_USER WITH LOGIN CREATEDB PASSWORD '$RMP_DB_PASSWORD';"
+    as_postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$RMP_DB_USER'" | grep -q 1 ||
+      as_postgres psql -c "CREATE ROLE $RMP_DB_USER WITH LOGIN CREATEDB PASSWORD '$RMP_DB_PASSWORD';"
   else
     if [ "$RMP_ENGINE" = mysql ]; then
       $SUDO apt-get install -y -qq build-essential default-libmysqlclient-dev mysql-server
