@@ -206,7 +206,7 @@ class Zippy < RedmineMorePreviews::Conversion
     if entry = zip_file.find_entry(asset)
       FileUtils.rm_rf(tmpasset) if File.exist?(tmpasset)
       FileUtils.mkdir_p(File.dirname(tmpasset)) 
-      zip_file.extract( entry, tmpasset)
+      File.open(tmpasset, "wb") {|f| f.write entry.get_input_stream.read }
     end #def
   end #def
   
