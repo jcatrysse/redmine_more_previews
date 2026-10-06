@@ -174,6 +174,7 @@ module RedmineMorePreviews
             Dir[thumbnail_path("*")].each do |thumb|
               File.delete(thumb)
             end
+            FileUtils.rm_f(markdownized_preview_cache_path) if respond_to?(:markdownized_preview_cache_path)
             if File.exist?( preview_storagepath )
               FileUtils.rm_rf( preview_storagepath )
             end
