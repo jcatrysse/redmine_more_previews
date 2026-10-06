@@ -18,12 +18,14 @@ what is left. Written 2026-10-06 from a measured analysis (report at the bottom)
 | Plugin id | `redmine_more_previews` |
 | GEOxyz runs today | `main` |
 | Upstream | HugoHasenbein/redmine_more_previews main @ 0bca937b36c56e3114e582b9bdf3384814d394ca (2025-02-13, 5.0.9) |
-| Runs on Redmine 7 as is | NEE |
+| Runs on Redmine 7 as is | NEE (boot) |
+| Runs on Redmine 7 after this branch | JA: tests and e2e green on PostgreSQL and MariaDB (see "Results") |
+| Migration session | done 2026-10-06, branch head in `git log`; work list below all done or deferred with reason |
 | Upstream sync | UPSTREAM DOOD: nothing upstream; fork already equals upstream 5.0.9 + 2 own commits; claude/redmine7-rails8-compat 4eb8dea cherry-picked |
 | After sync | n.v.t. |
 | Complexity (1 trivial .. 5 rewrite) | 3 |
 | Measured on | Redmine 7.0.1 (7.0-stable-GEOxyz + latest 7.0-stable), Rails 8.1.3.1, Ruby 3.3.6, PostgreSQL 16 and MariaDB 10.11 |
-| Branch head when this file was written | `70d635e` |
+| Branch head when this file was written | `70d635e` (plan), updated after the migration session |
 
 ## Already on this branch
 
@@ -31,6 +33,28 @@ what is left. Written 2026-10-06 from a measured analysis (report at the bottom)
 - `010837c` Use File.exist? instead of File.exists? in RmpFile.directory
 - `25b034c` Remove Redmine 7's markdownized preview cache in delete_from_disk!
 - `82ebac6` Write zip entries without Zip::File#extract (rubyzip 3)
+
+Added by the migration session (2026-10-06), one concern per commit, each with a test that fails
+without it (checked by reverting the fix in the test checkout):
+
+- `84eb934` test_setup.sh: create the PostgreSQL role when running as root (kit bug)
+- `49d9d34` test suite (the plugin had none) and e2e seed; tests for the four commits above
+- `65ac53a` locale keys that did not match English (pt-BR/pt/ru `label_debug`, cliff fr, nil_text pt, jp)
+- `3de7f41` **SECURITY** asset path traversal: arbitrary file read for anyone who can see a previewable attachment
+- `444c4b8` mark: textile previews (HTTP 500 before)
+- `d4efca3` **SECURITY** stored XSS: sandbox CSP on previews, sanitized inline previews, cliff escaping, zippy folder names
+- `81552a5` jQuery 3 `.on('load')` (JS error on every preview page)
+- `93e9a16` SVG icons (`sprite_icon`, falls back on 5.1)
+- `8558ef4` zippy: files in folders were double-encoded (empty download)
+- `fb7060c` vince: no links to stylesheets Redmine no longer ships
+- `20bdf3d` zippy/repository: archives in a repository previewed empty, their files not served
+- `bf9e6a7` repository previews allowed with `browse_repository`, as init.rb intended
+- `b04e121` preview URL without format: 404 instead of an octet-stream download
+- `9088fd0` **SECURITY** repository preview cache keyed by repository id and revision (cross-project leak)
+- `c19f76f` own review: sanitizer lists portable to Rails 6.1, revision memoized per request
+- `700d486`, `38bc789` OpenAI review resolutions; workflow installs pandoc (and converters for e2e)
+- `0725a43`, `07e502f`, `61efc98` e2e scenarios and screenshots (PostgreSQL, MariaDB, before on 5.1)
+- `804b409` CodeQL workflow manual only
 
 ## Work list for the migration session
 
@@ -43,6 +67,29 @@ In this order: things that break, security, the GEOxyz changes, the open items, 
 3. Pre-existing: $('#preview_frame').load(fn) removed in jQuery 3 -> JS error on every preview page; zippy links to files in subfolders double-encoded (%252F) -> empty download; vince view loads non-existent jquery-ui-1.11.0/tribute-3.7.3 CSS
 4. Dead upstream plus three old gems from the same author (hbl_text, hash_base, deep_try)
 
+**Verdicts (migration session)**
+
+1. Converter settings in production: **deferred to the upgrade**, it is a production setting, not code.
+   Listed under "After the upgrade"; the recommendation stands (core for pdf/images/txt/md; keep
+   libre, cliff, zippy). Note: since `d4efca3` a `.html` preview through pass or mark is sandboxed,
+   but core showing the source remains the safer default.
+2. Verified now: peek pdf (PDF served, `%PDF`), maggie png->jpg (ImageMagick + Ghostscript
+   installed), repository previews (md, docx, vcf, txt, zip, eml), tar and tgz (listing and files).
+   Not verifiable here: the PDF *viewer* in the page (headless Chromium has none; the PDF is checked
+   through its URL), maggie pdf->png (not activated: peek owns .pdf in the seed; same ImageMagick path
+   as core thumbnails, which render on the issue page).
+3. Done: `.on('load')` (`81552a5`), zippy encoding (`8558ef4`), vince CSS (`fb7060c`), icons
+   (`93e9a16`). Found and fixed on the way: path traversal (`3de7f41`), stored XSS (`d4efca3`),
+   repository cache leak (`9088fd0`), textile 500 (`444c4b8`), zip in repository (`20bdf3d`),
+   browse_repository (`bf9e6a7`), locales (`65ac53a`).
+4. Dead upstream and old gems: **deferred**, no Redmine 7 breakage. `hbl_text`, `hash_base`,
+   `deep_try` install and load on Ruby 3.3 / Rails 8.1. A replacement is a product decision
+   (open question 5).
+5. Tests: see "Results". 5.1-stable also run (the security fixes are meant to go to production early).
+6. Webhooks: **nothing to do.** The plugin does not change issue data or `issues/show.api.rsb`;
+   it only renders previews of attachments and repository files. Webhook payloads are unaffected.
+7. Every function by hand in a browser: see "Inventory" and "Results".
+
 **Checks**
 
 5. Run the plugin's whole test suite on Redmine 7.0-stable-GEOxyz with PostgreSQL AND MariaDB, and once on 5.1-stable if the branch is meant to stay 5.1-compatible.
@@ -53,16 +100,137 @@ In this order: things that break, security, the GEOxyz changes, the open items, 
 
 These GEOxyz commits are on the branch GEOxyz runs today and therefore on this branch. Review each one against the code it now sits on (upstream merges and Redmine 7 core): drop it if upstream or core now does the same, rewrite it if it is not up to the quality rules below (tests, I18n, security, portability), keep it otherwise. Record the verdict per commit in this file.
 
-| commit | date | subject |
+| commit | date | subject | verdict |
+|---|---|---|---|
+| `b564c08` | 2026-01-27 | Minor corrections in locales | **keep.** Renames `pt-br.yml` to `pt-BR.yml`; the key inside was already `pt-BR`, so no behaviour change. Covered by `test/unit/locales_test.rb`, which also found the real locale bugs fixed in `65ac53a`. |
+| `db97351` | 2025-12-06 | Correct Gemfile for usage with bundler | **keep.** zippy no longer declares rubyzip; Redmine core pins it (`rubyzip ~> 3.4.0` on 7.0, also present on 5.1). Proven by bundle install on 5.1 and 7.0 and the zip tests (`test_zip_*`, `test_tgz_asset`). |
+
+## Results (migration session, 2026-10-06)
+
+### Baseline, before any change (Redmine 7.0.1 GEOxyz, PostgreSQL 16)
+
+- Plugin tests: none existed ("This plugin has no tests").
+- `./.codex/e2e.sh`: smoke 15 screenshots / 0 problems, core 6 / 0 (`docs/e2e/baseline/`).
+  The smoke passed only because no converter was active; with converters on, the probes found the
+  path traversal, the textile 500, the JS error on every preview page and the broken zip links.
+
+### Plugin tests (`./.codex/test_plugin.sh`)
+
+| Redmine | database | result |
 |---|---|---|
-| `b564c08` | 2026-01-27 | Minor corrections in locales |
-| `db97351` | 2025-12-06 | Correct Gemfile for usage with bundler |
+| 7.0-stable-GEOxyz (7.0.1), Ruby 3.3.6, Rails 8.1.3.1, at `c19f76f` | PostgreSQL 16.15 | 46 runs, 375 assertions, 0 failures, 0 errors, 0 skips |
+| 7.0-stable-GEOxyz, at `c19f76f` | MariaDB 10.11.14 | 46 runs, 375 assertions, 0 failures, 0 errors, 0 skips |
+| 7.0-stable-GEOxyz + redmine_drawio, view_customize, redmine_wiki_extensions (redmine70-migration) | MariaDB 10.11 | 47 runs, 381 assertions, 0 failures, 0 errors, 0 skips (final test set, `38bc789`: + the Cc test from the review) |
+| 5.1-stable, Ruby 3.2.6, at `c19f76f` | PostgreSQL 16 | 46 runs, 361 assertions, 0 failures, 0 errors, 0 skips |
+
+Boot and production eager load: OK (the e2e server runs in production mode). Migrations: the plugin
+has none.
+
+### End to end (`./.codex/e2e.sh`, production mode, real browser)
+
+| run | smoke | core | plugin scenarios | problems |
+|---|---|---|---|---|
+| PostgreSQL 16 (`docs/e2e/`) | 15 | 6 | 8 scripts, 46 screenshots | 0 |
+| MariaDB 10.11 (`docs/e2e/mariadb/`) | 15 | 6 | 8 scripts, 46 screenshots | 0 |
+| MariaDB + 3 other GEOxyz plugins (not committed) | 15 | 6 | 8 scripts, 46 screenshots | 0 |
+| before: GEOxyz `main` on Redmine 5.1 (`docs/e2e/before/`) | - | - | 8 scripts | 65 problems, as expected: traversal LEAK, mail XSS ran, textile 500, JS errors, empty zip downloads |
+
+Every screenshot was opened and looked at. One table per scenario with captions: `docs/e2e/<scenario>.md`.
+
+### Inventory of functions
+
+| function | how a user reaches it | scenario | screenshots (docs/e2e/) |
+|---|---|---|---|
+| Preview takeover of an attachment (module on, converter active) | click an attachment | converters, permissions | converters-sample-*.png |
+| Libre: docx/odt/xlsx/csv... via LibreOffice (pdf, html, png) | attachment | converters | converters-sample-docx/odt/xlsx/csv |
+| Cliff: eml, headers box, all header fields, Unsafe reload | attachment | mail | mail-headers, mail-unsafe-reload, mail-hostile |
+| Vince: vcf business card | attachment, repository | converters, repository | converters-sample-vcf, repository-sample-vcf |
+| Mark: md (html), textile (inline) via pandoc | attachment, repository | converters, repository | converters-sample-md/textile, repository-sample-md |
+| Pass: html as is (sandboxed) | attachment | converters, security | converters-sample-html, security-sandbox |
+| Teddie: txt | attachment, repository | converters, repository | converters-sample-txt, repository-sample-txt |
+| Peek: pdf | attachment | converters | converters-sample-pdf |
+| Maggie: png -> jpg | attachment | converters | converters-sample-png |
+| Zippy: zip/tar/tgz listing, download of files (also in folders) | attachment, repository | archives, converters, repository | archives-*, repository-sample-zip |
+| Nil Text (debug converter) | settings only (not for production, says its own warning) | settings | settings-double |
+| Navigation between the attachments of a container | pagination under the preview | converters | converters-navigation-next |
+| Update (reload) of a cached preview | "Update" link | converters | converters-reload |
+| Repository entry preview + more_preview/more_asset routes | Repository > file | repository | repository-*.png |
+| Plugin settings: embedding object/iframe, absolute URL, cache, debug, converters, formats, double type warning, help | Administration > Plugins > Configure | settings | settings-*.png |
+| Project module "Redmine More Previews" | Project settings > Modules | permissions | permissions-module-off/on |
+| Permission `use_redmine_more_previews` (public) | member roles | permissions | permissions-reporter |
+| Converter checks on Administration > Information | Administration > Information | admin_info | admin_info-info |
+| File type icons in attachment lists (CSS hook) | any attachment list | converters | converters-issue-attachments |
+| Refusals: non-member on private project, anonymous, non-admin on settings and info | URL | permissions, settings, admin_info | *-refused, *-anonymous, permissions-outsider-page |
+| Failure paths: traversal, no converter, unknown id, no format | URL | security (+ integration tests) | security-traversal-404 |
+| REST API, mail in/out, rake, cron | the plugin has none | - | - |
+
+### Reviews
+
+- Own review of the whole diff `b564c08..HEAD`: two fixes in `c19f76f`.
+- OpenAI review (gpt-5): `docs/reviews/openai-2026-10-06-c19f76f.md` (5 findings: 2 fixed, 3 not
+  defects, with reasons) and a second pass `docs/reviews/openai-2026-10-06-700d486.md` (nothing new
+  accepted). Every finding has a resolution.
+
+### Not tested here (needs production or is out of reach)
+
+- The PDF viewer inside the page (headless Chromium has no PDF plugin; the PDFs are checked through
+  their URL: HTTP 200, `application/pdf`, `%PDF`). Check once in a real browser after the upgrade.
+- Other repository types than git (Subversion, Mercurial): same code path (`Repository#entry`,
+  `#cat`, `latest_changesets`), not exercised.
+- The full set of GEOxyz plugins together: three that touch attachments/wiki/views were run
+  together (above); the rest belongs in the coordinator's harness.
+- Windows-specific branches of the converters.
+
+## Open questions for Jan
+
+Decisions taken so the work could go on; each is built and can be reverted on its own commit.
+
+1. **Security fixes into production now?** `3de7f41` (any user who can see a previewable attachment
+   can read any file of the Redmine process, e.g. `config/database.yml`, `secret_token`), `d4efca3`
+   (a mail subject or html file runs script in the viewer's session) and `9088fd0` (repository
+   previews of one project shown in another) are present on `main` today (`docs/e2e/before/`).
+   They run on Redmine 5.1 (tests green on 5.1-stable). Options: (a) cherry-pick these three (plus
+   their tests) onto `main` now; (b) wait for the Redmine 7 upgrade; (c) meanwhile switch the module
+   off or deactivate the converters. **Recommendation: (a) now, and rotate the secrets a reader of
+   `config/` could have taken if the plugin was reachable by untrusted users.**
+2. **Sandboxing HTML previews** (`d4efca3`): previews and assets are served with
+   `Content-Security-Policy: sandbox ...` (except PDF). No converter uses JavaScript, so nothing users
+   rely on is lost; the only visible effect is that the vcard preview's Redmine web fonts are refused
+   (system font instead). Option: drop the sandbox and only escape/sanitize (weaker against an
+   uploaded `.html` or a hostile mail's HTML part). **Recommendation: keep.**
+3. **Inline previews are sanitized** (Rails sanitizer + tables, `style`, `colspan`, `rowspan`,
+   `align`, `download`). Converted documents rendered inline lose `<script>`, `<iframe>`, `<link>`,
+   `<style>` elements and event attributes. Vince *inline* would lose its stylesheet link (the seed
+   and the recommendation use vince *html*). **Recommendation: keep.**
+4. **Converter settings in production** (pass and mark-html off, core for pdf/images/txt/md): see
+   "After the upgrade". Needs your choice per file type.
+5. **Dead upstream and three old gems** (`hbl_text`, `hash_base`, `deep_try`): they work on Redmine 7.
+   Options: keep as is; or later fold libre/cliff/zippy into a small maintained GEOxyz plugin.
+   **Recommendation: keep for the upgrade, decide after.**
+6. **Repository previews with `browse_repository` alone** (`bf9e6a7`): init.rb always intended this,
+   but the bug meant `view_changesets` was needed. A role that browses the repository without
+   "View changesets" now sees the preview instead of a 403 inside the page (it could already
+   download the file through core). **Recommendation: keep.**
+7. **CodeQL workflow** (`804b409`): changed to manual only per CLAUDE.md; it has an empty language
+   matrix and does nothing useful. Option: delete it. **Recommendation: delete later, harmless now.**
 
 ## After the upgrade (production)
 
 Actions the person doing the upgrade must take, or know about, for this plugin:
 
 - Review the converter settings: let core handle pdf, images, txt and md; keep libre/cliff/zippy. Install LibreOffice and Ghostscript on the server if kept; core needs Pandoc for its own Office preview.
+- Empty the preview cache once after deploying: `rm -rf <redmine>/tmp/more_previews/*`. Cached zip
+  tables from before still carry the double-encoded links, and repository previews moved to a new
+  layout (by repository id and revision; the old directories are never read again).
+- The mark converter (md/textile) needs `pandoc` on the server, zippy nothing, maggie ImageMagick,
+  maggie/peek pdf->image Ghostscript, libre LibreOffice (`soffice`). Administration > Information
+  lists each check.
+- The plugin writes to `public/plugin_assets/redmine_more_previews/converters` at boot (converter
+  logos and icons); that directory must be writable for the Redmine user, as on 5.1.
+- Check once in a real browser that a PDF preview (peek, or libre to pdf) shows in the page.
+- If (1) under "Open questions" is not done before: after the upgrade, rotate the secrets readable
+  through the old traversal (database password, `secret_key_base`, mail and LDAP credentials in
+  `config/`), if untrusted users could reach a previewable attachment.
 
 ## How to test
 
