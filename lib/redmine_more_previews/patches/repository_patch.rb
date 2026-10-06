@@ -63,7 +63,7 @@ module RedmineMorePreviews
                 File.open( filepath, "wb") {|f| f.write(cat(path, rev))}
                 RedmineMorePreviews::Converter.convert(
                   filepath,
-                  preview_filepath(path, rev, options),
+                  preview_assetpath(path, rev, options),
                   options.merge(
                     :object => {:type => :repository, :object => self, :path => path, :rev => rev},
                     :preview_format => preview_format(path, rev)
@@ -180,8 +180,8 @@ module RedmineMorePreviews
           
           # asset file name
           def preview_assetname(path, rev, options={})
-            format = options[:format].presence || preview_format(path, rev).presence
-            [options[:asset], format].compact.join(".")
+            # like Attachment#preview_assetname: the asset name carries its extension
+            [options[:asset], options[:assetformat].presence].compact.join(".")
           end #def
           
           # full path to asset file on disk

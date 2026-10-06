@@ -73,7 +73,7 @@ end
 project.enabled_module_names = (project.enabled_module_names | ['repository'])
 repository = project.repositories.find_by(identifier: 'samples') ||
              Repository::Git.new(project: project, identifier: 'samples', is_default: true)
-repository.url = File.join(repo_dir, '.git') # git wants the .git directory of a working copy
+repository.url = repository.root_url = File.join(repo_dir, '.git') # git wants the .git directory of a working copy
 repository.save!
 repository.fetch_changesets
 

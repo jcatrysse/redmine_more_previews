@@ -8,7 +8,7 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
   fixtures :projects, :users, :email_addresses, :user_preferences, :members, :member_roles, :roles,
            :enabled_modules, :trackers, :projects_trackers, :issue_statuses, :issues, :enumerations
 
-  CONVERTERS = { :teddie => { :txt => :txt }, :mark => { :md => :inline }, :zippy => { :zip => :html } }
+  CONVERTERS = { :teddie => { :txt => :txt }, :mark => { :md => :inline }, :zippy => { :zip => :html }, :cliff => { :eml => :html } }
 
   def setup
     assert Redmine::Scm::Adapters::GitAdapter.client_available, 'git is needed for the repository previews'
@@ -17,6 +17,7 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
     FileUtils.cp(File.join(FILES, 'sample.txt'), File.join(@dir, 'docs'))
     FileUtils.cp(File.join(FILES, 'sample.md'), @dir)
     FileUtils.cp(File.join(FILES, 'sample.zip'), @dir)
+    FileUtils.cp(File.join(FILES, 'sample.eml'), @dir)
     git = ->(*args) { system('git', '-C', @dir, *args, exception: true, out: File::NULL, err: File::NULL) }
     git.call('init', '-q', '-b', 'main')
     git.call('add', '.')
@@ -57,6 +58,31 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
       get '/projects/ecookbook/repository/samples/preview/docs/sample.txt@/index.txt'
       assert_response :success
       assert_include 'Plain text sample', response.body
+    end
+  end
+
+  def test_zip_entry_lists_its_files_and_serves_them
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get '/projects/ecookbook/repository/samples/preview/sample.zip@/index.html'
+      assert_response :success
+      href = css_select('a[download="hello.txt"]').first&.[]('href')
+      assert_equal '/projects/ecookbook/repository/samples/preview/sample.zip@/index.html?asset=inner%2Fhello.txt', href
+      get href
+      assert_response :success
+      assert_equal "hello inner\n", response.body
+    end
+  end
+
+  def test_mail_entry_shows_the_headers_and_the_body
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get '/projects/ecookbook/repository/samples/entry/sample.eml'
+      assert_response :success
+      assert_select '#preview_repository_entry_top .box td', :text => 'Sample mail for the preview'
+      get '/projects/ecookbook/repository/samples/preview/sample.eml@/index.html'
+      assert_response :success
+      assert_include 'this is the body of the sample mail', response.body
     end
   end
 

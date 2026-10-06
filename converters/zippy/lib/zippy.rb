@@ -119,8 +119,20 @@ class Zippy < RedmineMorePreviews::Conversion
   # tarlink
   #---------------------------------------------------------------------------------------
   def tarlink( entry, asset=nil )
-    path   = url_helpers.more_preview_path(request.params.symbolize_keys.merge(:asset => entry.full_name))
+    path   = asset_link_path(entry.full_name)
     link_to File.basename(RmpText.to_utf8(entry.full_name)), path, :download => File.basename(RmpText.to_utf8(entry.full_name))
+  end #def
+  
+  #---------------------------------------------------------------------------------------
+  # asset_link_path: the page that serves an entry of the archive
+  #---------------------------------------------------------------------------------------
+  def asset_link_path( name )
+    if object['type'] == :repository
+      # the repository entry or preview the table is shown on
+      url_helpers.url_for(request.params.symbolize_keys.merge(:asset => name, :only_path => true))
+    else
+      url_helpers.more_preview_path(request.params.symbolize_keys.merge(:asset => name))
+    end
   end #def
   
   #---------------------------------------------------------------------------------------
@@ -195,7 +207,7 @@ class Zippy < RedmineMorePreviews::Conversion
   # ziplink
   #---------------------------------------------------------------------------------------
   def ziplink( entry, asset=nil )
-    path   = url_helpers.more_preview_path(request.params.symbolize_keys.merge(:asset => entry.name))
+    path   = asset_link_path(entry.name)
     link_to File.basename(RmpText.to_utf8(entry.name)), path, :download => File.basename(RmpText.to_utf8(entry.name))
   end #def
   
