@@ -161,27 +161,19 @@ module RedmineMorePreviews
              File.join(preview_dirname(options.merge(:format => preview_format)), preview_assetname(options) )
          end #def
           
-          ################################################################################
-          #
-          # overridden functions
-          #
-          ################################################################################
-          # class specific
-          def delete_from_disk!
-            if disk_filename.present? && File.exist?(diskfile)
-              File.delete(diskfile)
-            end
-            Dir[thumbnail_path("*")].each do |thumb|
-              File.delete(thumb)
-            end
-            FileUtils.rm_f(markdownized_preview_cache_path) if respond_to?(:markdownized_preview_cache_path)
-            if File.exist?( preview_storagepath )
-              FileUtils.rm_rf( preview_storagepath )
-            end
-          end #def
-          
         end #base
+        base.prepend(DiskCleanup)
       end #self
+      
+      # Core's delete_from_disk! removes the file, thumbnails and the markdown
+      # preview cache; remove the converted previews as well.
+      module DiskCleanup
+        def delete_from_disk!
+          super
+          FileUtils.rm_rf( preview_storagepath ) if File.exist?( preview_storagepath )
+        end #def
+        private :delete_from_disk!
+      end #module
        
     end
   end  

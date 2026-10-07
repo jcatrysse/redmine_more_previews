@@ -60,6 +60,27 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  # another plugin's prepend on a core filter is honoured by the plugin's actions
+  module SpyOnFindAttachment
+    mattr_accessor :calls, default: 0
+    def find_attachment
+      SpyOnFindAttachment.calls += 1
+      super
+    end
+  end
+  AttachmentsController.prepend(SpyOnFindAttachment)
+
+  def test_more_preview_runs_core_filters_through_other_plugins_prepends
+    attachment = preview_attachment(@issue, 'sample.txt')
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      SpyOnFindAttachment.calls = 0
+      get "/attachments/more_preview/#{attachment.id}/index.txt"
+      assert_response :success
+      assert_equal 1, SpyOnFindAttachment.calls
+    end
+  end
+
   def test_more_preview_returns_the_conversion
     attachment = preview_attachment(@issue, 'sample.txt')
     with_converters(CONVERTERS) do

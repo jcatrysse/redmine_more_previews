@@ -31,10 +31,11 @@ module RedmineMorePreviews
           
           prepend ClassMethods
           
-          alias_method  :find_attachment_for_more_preview, :find_attachment
-          alias_method  :read_authorize_for_more_preview,  :read_authorize
-          before_action :find_attachment_for_more_preview, :only => [:more_preview, :more_asset]
-          before_action :read_authorize_for_more_preview,  :only => [:more_preview, :more_asset]
+          # lambdas, not the method names: a second before_action :find_attachment would
+          # replace core's (and its :only list); calling the methods keeps other plugins'
+          # prepends on them in the chain (no alias_method copies)
+          before_action -> { find_attachment },            :only => [:more_preview, :more_asset]
+          before_action -> { read_authorize },             :only => [:more_preview, :more_asset]
           before_action :find_asset_param,                 :only => [:more_preview, :more_asset]
           
           ################################################################################

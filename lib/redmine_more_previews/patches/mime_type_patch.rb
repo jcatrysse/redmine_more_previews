@@ -24,18 +24,18 @@ module RedmineMorePreviews
   module Patches
     module MimeTypePatch
       def self.included(base)
-        base.class_eval do
-          #unloadable
-          
-          # Returns the css class associated to
-          # the mime type of name
-          def self.css_class_of(name)
-            mimetype = of(name)
-            mimetype&.gsub(/[^a-z^A-Z^0-9]/, "-")
-          end #def
-          
-        end #base
+        base.singleton_class.prepend(ClassMethods)
       end #self
+      
+      module ClassMethods
+        # Returns the css class associated to the mime type of name; every
+        # character but letters and digits becomes "-", to match the converters'
+        # icon classes (core keeps the dots)
+        def css_class_of(name)
+          mimetype = of(name)
+          mimetype&.gsub(/[^a-z^A-Z^0-9]/, "-")
+        end #def
+      end #module
       
     end #module
   end #module

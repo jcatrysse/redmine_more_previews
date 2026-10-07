@@ -30,8 +30,8 @@ module RedmineMorePreviews
             
          prepend ClassMethods
             
-          alias_method  :find_project_repository_for_more_preview, :find_project_repository
-          before_action :find_project_repository_for_more_preview, :only => [:more_asset, :more_preview ]
+          # a lambda, see AttachmentsControllerPatch
+          before_action -> { find_project_repository },    :only => [:more_asset, :more_preview ]
           before_action :find_path_param,                          :only => [:more_asset, :more_preview ]
           
           ################################################################################
