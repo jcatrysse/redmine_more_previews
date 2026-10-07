@@ -182,38 +182,41 @@ Every screenshot was opened and looked at. One table per scenario with captions:
   together (above); the rest belongs in the coordinator's harness.
 - Windows-specific branches of the converters.
 
-## Open questions for Jan
+## Decided by Jan (2026-10-07)
 
-Decisions taken so the work could go on; each is built and can be reverted on its own commit.
+Answered by Jan on 2026-10-07 in the coordinating session (source: `docs/DECISIONS-2026-10-07.md`).
+His choices and notes are quoted verbatim. Nothing is open for this plugin.
 
-1. **Security fixes into production now?** `3de7f41` (any user who can see a previewable attachment
-   can read any file of the Redmine process, e.g. `config/database.yml`, `secret_token`), `d4efca3`
-   (a mail subject or html file runs script in the viewer's session) and `9088fd0` (repository
-   previews of one project shown in another) are present on `main` today (`docs/e2e/before/`).
-   They run on Redmine 5.1 (tests green on 5.1-stable). Options: (a) cherry-pick these three (plus
-   their tests) onto `main` now; (b) wait for the Redmine 7 upgrade; (c) meanwhile switch the module
-   off or deactivate the converters. **Recommendation: (a) now, and rotate the secrets a reader of
-   `config/` could have taken if the plugin was reachable by untrusted users.**
-2. **Sandboxing HTML previews** (`d4efca3`): previews and assets are served with
-   `Content-Security-Policy: sandbox ...` (except PDF). No converter uses JavaScript, so nothing users
-   rely on is lost; the only visible effect is that the vcard preview's Redmine web fonts are refused
-   (system font instead). Option: drop the sandbox and only escape/sanitize (weaker against an
-   uploaded `.html` or a hostile mail's HTML part). **Recommendation: keep.**
-3. **Inline previews are sanitized** (Rails sanitizer + tables, `style`, `colspan`, `rowspan`,
-   `align`, `download`). Converted documents rendered inline lose `<script>`, `<iframe>`, `<link>`,
-   `<style>` elements and event attributes. Vince *inline* would lose its stylesheet link (the seed
-   and the recommendation use vince *html*). **Recommendation: keep.**
-4. **Converter settings in production** (pass and mark-html off, core for pdf/images/txt/md): see
-   "After the upgrade". Needs your choice per file type.
-5. **Dead upstream and three old gems** (`hbl_text`, `hash_base`, `deep_try`): they work on Redmine 7.
-   Options: keep as is; or later fold libre/cliff/zippy into a small maintained GEOxyz plugin.
-   **Recommendation: keep for the upgrade, decide after.**
-6. **Repository previews with `browse_repository` alone** (`bf9e6a7`): init.rb always intended this,
-   but the bug meant `view_changesets` was needed. A role that browses the repository without
-   "View changesets" now sees the preview instead of a 403 inside the page (it could already
-   download the file through core). **Recommendation: keep.**
-7. **CodeQL workflow** (`804b409`): changed to manual only per CLAUDE.md; it has an empty language
-   matrix and does nothing useful. Option: delete it. **Recommendation: delete later, harmless now.**
+**General decisions, for every GEOxyz plugin**
+
+- GEOxyz goes straight to Redmine 7: no backports to 5.1. Nothing is cherry-picked to the default
+  branch or to the branch production runs today; `redmine70-migration` is what goes live with
+  Redmine 7. Redmine 5.1 compatibility is no longer a requirement. -> Rules updated; the code paths
+  this branch had added only for 5.1 are removed (see "Built for the decisions").
+  *(This replaces former open question 1, "security fixes into production now": they go live with
+  Redmine 7, not earlier.)*
+- GEOxyz does not use MariaDB or MySQL; production runs PostgreSQL 16. Tests and e2e on PostgreSQL
+  only; a MariaDB-only problem is a note, not a blocker. -> Rules updated. The MariaDB runs already
+  made stay in "Results" as information.
+- deface without a version constraint: **not applicable**, this plugin does not use deface.
+- Core methods that other plugins also patch are patched with `prepend`, never `alias_method`. ->
+  This plugin used `alias_method` to copy `find_attachment`, `read_authorize` and
+  `find_project_repository` (not a chain, but it bypassed other plugins' prepends on those
+  methods) and redefined `Attachment#delete_from_disk!` outright. Both changed (see below).
+- GitHub Actions stay manual only: already so (`redmine-tests.yml`, `codeql-analysis.yml`).
+
+**Decisions for this plugin**
+
+| question | Jan's choice (verbatim) | what it means here |
+|---|---|---|
+| q1 Wachtwoorden en geheime sleutels uit de serverconfiguratie vervangen na de upgrade? | B: "Niet nodig, alleen vertrouwde gebruikers" (Geen werk, maar alleen verantwoord als geen onbetrouwbare gebruiker ooit een previewbare bijlage kon openen.) | Recorded only: no rotation step after the upgrade. The traversal fix itself (`3de7f41`) goes live with Redmine 7. |
+| q2 Voorbeeldweergaven blijven in een afgeschermde omgeving (zandbak) draaien? | A: "Zandbak houden" (De beste bescherming tegen een vijandig HTML-bestand of mail; de vCard toont een ander lettertype.) | Kept as built in `d4efca3`. |
+| q3 Welke bestandstypes laat je na de upgrade door Redmine zelf tonen in plaats van door de plugin? | A: "Advies volgen" (Redmine toont pdf, beelden, tekst en md, de plugin houdt Office, mail en zip, en de converters pass en mark-html gaan uit.) | Built as a rake task that switches exactly those types off in the plugin settings, run once after the upgrade (see "After the upgrade"). |
+| q4 Wat doen we met de verlaten upstream en de drie oude bibliotheken van deze plugin? | A: "Houden voor de upgrade, daarna beslissen" (Geen werk nu; de niet-onderhouden code blijft voorlopig in gebruik.) | Recorded; no change. To decide after the upgrade. |
+| q5 De nutteloze CodeQL-controle in de repository nu verwijderen of later? | A: "Op handmatig laten, later verwijderen" (Geen werk nu; het bestand blijft voorlopig staan.) | Kept manual (`804b409`); delete later. |
+
+Former open questions 3 (inline previews sanitized) and 6 (previews with `browse_repository`
+alone) were not put to Jan separately; they stay as built and recorded in "Already on this branch".
 
 ## After the upgrade (production)
 
@@ -229,9 +232,8 @@ Actions the person doing the upgrade must take, or know about, for this plugin:
 - The plugin writes to `public/plugin_assets/redmine_more_previews/converters` at boot (converter
   logos and icons); that directory must be writable for the Redmine user, as on 5.1.
 - Check once in a real browser that a PDF preview (peek, or libre to pdf) shows in the page.
-- If (1) under "Open questions" is not done before: after the upgrade, rotate the secrets readable
-  through the old traversal (database password, `secret_key_base`, mail and LDAP credentials in
-  `config/`), if untrusted users could reach a previewable attachment.
+- No rotation of passwords or secret keys after the upgrade (Jan, 2026-10-07, q1: "Niet nodig, alleen
+  vertrouwde gebruikers").
 
 ## How to test
 
@@ -342,7 +344,12 @@ results quoted in the analysis come from it.
   (on by default: `t.sudo()` in a scenario). The breaker list is in the migration kit's CHECKLIST.md.
 - **Locales**: keep the locales the plugin ships in sync; translate a new key by matching the
   closest existing key in the same file, not from scratch; do not add new languages.
-- **5.1 compatibility**: prefer fixes that also run on Redmine 5.1 so they can be merged early;
+- **No 5.1** (Jan, 2026-10-07): Redmine 5.1 compatibility is no longer required; do not add code
+  paths that exist only for 5.1.
+- **PostgreSQL only** (Jan, 2026-10-07): production runs PostgreSQL 16; tests and e2e run there.
+  Keep SQL portable where it costs nothing; a MariaDB-only problem is a note, not a blocker.
+- **prepend, never alias_method** (Jan, 2026-10-07) on a core method other plugins also patch.
+- (former) **5.1 compatibility**: prefer fixes that also run on Redmine 5.1 so they can be merged early;
   say so when a fix cannot.
 - **Git**: work on `redmine70-migration` only; never push to the default branch; never force-push
   a branch someone else uses. Descriptive commit messages (what and why). Push after every
@@ -354,7 +361,7 @@ results quoted in the analysis come from it.
 ## Definition of done
 
 - All items of the work list are done or explicitly deferred with a reason, in this file.
-- The plugin's tests are green on Redmine 7.0-stable-GEOxyz with PostgreSQL and MariaDB
+- The plugin's tests are green on Redmine 7.0-stable-GEOxyz with PostgreSQL (MariaDB no longer required, 2026-10-07)
   (numbers in this file); boot, production-like eager load, migrations up/down OK.
 - Every function in the inventory exercised end to end on a real running Redmine, with and
   without permissions and on its failure paths; `./.codex/e2e.sh` green; screenshots looked at,
