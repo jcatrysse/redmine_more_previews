@@ -316,12 +316,8 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
       log_user('jsmith', 'jsmith')
       get "/attachments/#{attachment.id}"
       assert_response :success
-      if Redmine::VERSION::MAJOR >= 6 # SVG sprite icons replaced the icon-* CSS
-        assert_select 'a.icon-reload svg use[href*=?]', 'icon--reload'
-        assert_select 'a.icon-warning svg use[href*=?]', 'icon--warning'
-      else
-        assert_select 'a.icon-reload', :text => I18n.t(:button_update)
-      end
+      assert_select 'a.icon-reload svg use[href*=?]', 'icon--reload'
+      assert_select 'a.icon-warning svg use[href*=?]', 'icon--warning'
     end
   end
 

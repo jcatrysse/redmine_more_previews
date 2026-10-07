@@ -30,10 +30,7 @@ class AttachmentPatchTest < ActiveSupport::TestCase
 
   def test_destroy_removes_the_markdownized_preview_cache_of_redmine_7
     attachment = preview_attachment(Issue.find(1), 'sample.docx')
-    # Redmine 7 added this cache (and its removal to Attachment#delete_from_disk!)
-    assert_equal Redmine::VERSION::MAJOR >= 7, attachment.respond_to?(:markdownized_preview_cache_path)
-    return attachment.destroy unless attachment.respond_to?(:markdownized_preview_cache_path)
-
+    # Redmine 7 caches the markdown it previews docx in; destroy must remove it
     path = attachment.send(:markdownized_preview_cache_path)
     FileUtils.mkdir_p(File.dirname(path))
     File.write(path, 'cached markdown')

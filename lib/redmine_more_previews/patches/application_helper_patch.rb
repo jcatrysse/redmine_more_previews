@@ -30,11 +30,6 @@ module RedmineMorePreviews
         
           #unloadable 
           
-          # SVG icon on Redmine 6 and later, the icon-* CSS class still does it on 5.1
-          def more_previews_icon(name, label=nil)
-            respond_to?(:sprite_icon) ? sprite_icon(name, label) : label
-          end #def
-          
           # inline previews are converted user files rendered into the page itself
           def more_previews_inline(html)
             sanitize(RedmineMorePreviews::Lib::RmpText.to_utf8(html.to_s),
