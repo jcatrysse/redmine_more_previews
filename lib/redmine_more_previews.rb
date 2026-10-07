@@ -33,6 +33,7 @@ require_relative "redmine_more_previews/controller_helper"
 require_relative "redmine_more_previews/converter"
 require_relative "redmine_more_previews/conversion"
 require_relative "redmine_more_previews/plugin_loader"
+require_relative "redmine_more_previews/core_handover"
 
 require_relative "redmine_more_previews/patches"
 

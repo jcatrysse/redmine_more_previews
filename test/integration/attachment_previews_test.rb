@@ -81,6 +81,24 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  def test_after_the_hand_over_core_previews_pdf_and_the_plugin_keeps_office
+    pdf = preview_attachment(@issue, 'sample.pdf')
+    md = preview_attachment(@issue, 'sample.md')
+    eml = preview_attachment(@issue, 'sample.eml')
+    with_converters(CONVERTERS.merge(:peek => { :pdf => :pdf })) do
+      RedmineMorePreviews::CoreHandover.apply!
+      log_user('jsmith', 'jsmith')
+      get "/attachments/#{pdf.id}"
+      assert_response :success
+      assert_select '#preview_pane', 0
+      get "/attachments/#{md.id}"
+      assert_select '#preview_pane', 0
+      assert_select '.filecontent.wiki h1', :text => 'Markdown sample' # core's markdown preview
+      get "/attachments/#{eml.id}"
+      assert_select '#preview_pane'
+    end
+  end
+
   def test_more_preview_returns_the_conversion
     attachment = preview_attachment(@issue, 'sample.txt')
     with_converters(CONVERTERS) do
