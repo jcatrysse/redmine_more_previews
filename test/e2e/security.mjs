@@ -2,12 +2,13 @@
 // file the server could read), a file type without converter, a non-numeric id,
 // and the sandbox header on an HTML preview.
 import { e2e } from '../../.codex/e2e/lib.mjs';
+import fs from 'node:fs';
 
 const t = await e2e('security');
 await t.login('reporter');
 const att = {};
-const pub = (await (await t.page.request.get(`${t.BASE}/issues.json?project_id=e2e-project&subject=E2E%20previews`)).json()).issues[0];
-for (const a of (await (await t.page.request.get(`${t.BASE}/issues/${pub.id}.json?include=attachments`)).json()).issue.attachments) att[a.filename] = a.id;
+const pub = (await (await t.page.request.get(`${t.BASE}/issues.json?project_id=e2e-project&subject=E2E%20previews`, { headers: e2eApiKey() })).json()).issues[0];
+for (const a of (await (await t.page.request.get(`${t.BASE}/issues/${pub.id}.json?include=attachments`, { headers: e2eApiKey() })).json()).issue.attachments) att[a.filename] = a.id;
 
 const rows = [];
 async function probe(path, want, mustNotContain) {
@@ -40,3 +41,8 @@ if (r.headers()['x-content-type-options'] !== 'nosniff') t.problems.push('no nos
 await t.go(`/attachments/more_preview/${att['sample.html']}/index.html`);
 await t.shot('sandbox', `An HTML preview opened directly: rendered, but with "Content-Security-Policy: ${csp}" (no script, opaque origin)`, { full: false });
 await t.done();
+
+// lookups through the manager's API key (test/e2e/seed.rb): a plugin may restrict issue data for a session
+function e2eApiKey() {
+  return { 'X-Redmine-API-Key': fs.readFileSync(`${process.env.REDMINE_DIR}/tmp/e2e-manager-api-key`, 'utf8').trim() };
+}

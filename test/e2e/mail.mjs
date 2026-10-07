@@ -2,13 +2,14 @@
 // behind "...", "Unsafe reload" converts without the cache; a mail whose subject
 // and body carry HTML is shown as text and runs nothing.
 import { e2e } from '../../.codex/e2e/lib.mjs';
+import fs from 'node:fs';
 
 const t = await e2e('mail');
 await t.login('manager');
-const issues = await (await t.page.request.get(`${t.BASE}/issues.json?project_id=e2e-project&subject=E2E%20previews`)).json();
+const issues = await (await t.page.request.get(`${t.BASE}/issues.json?project_id=e2e-project&subject=E2E%20previews`, { headers: e2eApiKey() })).json();
 const issueId = issues.issues[0].id;
 const att = {};
-for (const a of (await (await t.page.request.get(`${t.BASE}/issues/${issueId}.json?include=attachments`)).json()).issue.attachments) att[a.filename] = a.id;
+for (const a of (await (await t.page.request.get(`${t.BASE}/issues/${issueId}.json?include=attachments`, { headers: e2eApiKey() })).json()).issue.attachments) att[a.filename] = a.id;
 
 await t.go(`/attachments/${att['sample.eml']}`);
 const box = await t.page.locator('#preview_repository_entry_top .box').first().innerText();
@@ -27,7 +28,7 @@ await t.page.mouse.move(0, 0);
 await t.shot('unsafe-reload', '"Unsafe reload" converts the mail again without the cache', { full: false });
 
 // a hostile mail, uploaded through the REST API as the manager
-const fs = await import('node:fs');
+
 const mail = fs.readFileSync('test/fixtures/files/sample.eml', 'utf8')
   .replace('Subject: Sample mail for the preview', 'Subject: <img src=x onerror="document.title=\'pwned\'"> hostile')
   .replace('this is the body', '<script>document.title="pwned"</script><b>bold?</b> this is the body');
@@ -38,7 +39,7 @@ const put = await t.page.request.put(`${t.BASE}/issues/${issueId}.json`, {
   headers: { 'Content-Type': 'application/json', 'X-Redmine-API-Key': await apiKey() },
   data: { issue: { uploads: [{ token, filename: 'hostile.eml', content_type: 'message/rfc822' }] } } });
 if (put.status() !== 204) t.problems.push(`attach hostile mail: HTTP ${put.status()}`);
-const atts = (await (await t.page.request.get(`${t.BASE}/issues/${issueId}.json?include=attachments`)).json()).issue.attachments;
+const atts = (await (await t.page.request.get(`${t.BASE}/issues/${issueId}.json?include=attachments`, { headers: e2eApiKey() })).json()).issue.attachments;
 const hostile = atts.filter(a => a.filename === 'hostile.eml').pop();
 await t.go(`/attachments/${hostile.id}`);
 await t.page.waitForTimeout(1500);
@@ -54,4 +55,9 @@ await t.done();
 async function apiKey() {
   // written by test/e2e/seed.rb
   return fs.readFileSync(`${process.env.REDMINE_DIR}/tmp/e2e-manager-api-key`, 'utf8').trim();
+}
+
+// lookups through the manager's API key (test/e2e/seed.rb): a plugin may restrict issue data for a session
+function e2eApiKey() {
+  return { 'X-Redmine-API-Key': fs.readFileSync(`${process.env.REDMINE_DIR}/tmp/e2e-manager-api-key`, 'utf8').trim() };
 }

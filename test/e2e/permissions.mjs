@@ -42,23 +42,29 @@ if (!t.page.url().includes('/login')) t.problems.push(`anonymous: ${t.page.url()
 await t.shot('anonymous', 'Anonymous on the private attachment is sent to the login', { full: false });
 
 // project module off: core's preview, the plugin's URL still refuses nothing it should not
-await t.login('admin');
-await t.go('/projects/e2e-private/settings/modules');
-await t.sudo();
-await t.page.uncheck('#project_enabled_module_names_redmine_more_previews');
-await t.page.click('#modules-form input[type=submit], form input[name=commit]');
-await t.settle();
-t.check('module off');
-await t.login('manager');
-await t.go(`/attachments/${priv['sample.md']}`);
-if (await t.page.locator('#preview_pane').count()) t.problems.push('module off: plugin preview still shown');
-await t.shot('module-off', 'Module "Redmine More Previews" off in the private project: Redmine 7 shows its own markdown preview', { full: false });
-await t.login('admin');
-await t.go('/projects/e2e-private/settings/modules');
-await t.sudo();
-await t.page.check('#project_enabled_module_names_redmine_more_previews');
-await t.page.click('#modules-form input[type=submit], form input[name=commit]');
-await t.settle();
-t.check('module on');
-await t.shot('module-on', 'Module switched on again in the project settings (admin)', { full: false });
+async function setModule(on) {
+  await t.login('admin');
+  await t.go('/projects/e2e-private/settings/modules'); // a failing page is recorded by go()
+  await t.sudo();
+  const box = t.page.locator('#project_enabled_module_names_redmine_more_previews');
+  if (!(await box.count())) { // the page itself failed (another plugin), recorded as a problem
+    t.problems.push(`project settings > modules unavailable (HTTP error page), module not switched ${on ? 'on' : 'off'}`);
+    return false;
+  }
+  if (on) await box.check(); else await box.uncheck();
+  await t.page.click('#modules-form input[type=submit], form input[name=commit]');
+  await t.settle();
+  t.check(`module ${on ? 'on' : 'off'}`);
+  return true;
+}
+if (await setModule(false)) {
+  await t.login('manager');
+  await t.go(`/attachments/${priv['sample.md']}`);
+  if (await t.page.locator('#preview_pane').count()) t.problems.push('module off: plugin preview still shown');
+  await t.shot('module-off', 'Module "Redmine More Previews" off in the private project: Redmine 7 shows its own markdown preview', { full: false });
+  await setModule(true);
+  await t.shot('module-on', 'Module switched on again in the project settings (admin)', { full: false });
+} else {
+  await t.shot('module-settings-error', 'Project settings could not be opened, so the module was not switched (see the problems of this run)', { full: false });
+}
 await t.done();

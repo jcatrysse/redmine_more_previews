@@ -1,13 +1,14 @@
 // Zippy: files inside a zip, tar and tgz attachment are listed and can be
 // downloaded from the (sandboxed) preview, also from a folder.
 import { e2e } from '../../.codex/e2e/lib.mjs';
+import fs from 'node:fs';
 
 const t = await e2e('archives');
 await t.login('reporter'); // member without any special permission: the plugin's permission is public
 
-const issues = await (await t.page.request.get(`${t.BASE}/issues.json?project_id=e2e-project&subject=E2E%20previews`)).json();
+const issues = await (await t.page.request.get(`${t.BASE}/issues.json?project_id=e2e-project&subject=E2E%20previews`, { headers: e2eApiKey() })).json();
 const att = {};
-for (const a of (await (await t.page.request.get(`${t.BASE}/issues/${issues.issues[0].id}.json?include=attachments`)).json()).issue.attachments) att[a.filename] = a.id;
+for (const a of (await (await t.page.request.get(`${t.BASE}/issues/${issues.issues[0].id}.json?include=attachments`, { headers: e2eApiKey() })).json()).issue.attachments) att[a.filename] = a.id;
 
 // zip: the table is an HTML preview in an <object>; click the file in the folder
 await t.go(`/attachments/${att['sample.zip']}`);
@@ -49,3 +50,8 @@ await t.go(`/attachments/${att['sample.tgz']}`);
 await t.page.mouse.move(0, 0);
 await t.shot('tgz', 'Tgz listing; top.txt and inner/hello.txt served as downloads with their content (checked through their URLs)', { full: false });
 await t.done();
+
+// lookups through the manager's API key (test/e2e/seed.rb): a plugin may restrict issue data for a session
+function e2eApiKey() {
+  return { 'X-Redmine-API-Key': fs.readFileSync(`${process.env.REDMINE_DIR}/tmp/e2e-manager-api-key`, 'utf8').trim() };
+}

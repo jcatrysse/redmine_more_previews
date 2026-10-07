@@ -3,6 +3,7 @@
 // and shows a preview still works, shows the warning for a file type claimed by
 // two converters, and the refusal for a non-admin. Restores the settings.
 import { e2e } from '../../.codex/e2e/lib.mjs';
+import fs from 'node:fs';
 
 const t = await e2e('settings');
 const URL = '/settings/plugin/redmine_more_previews';
@@ -33,9 +34,9 @@ await t.page.check('input[name="settings[embedding]"][value="1"]');
 await t.page.uncheck('input[name="settings[cache_previews]"]');
 await save('iframe and no cache');
 
-const issues = await (await t.page.request.get(`${t.BASE}/issues.json?project_id=e2e-project&subject=E2E%20previews`)).json();
+const issues = await (await t.page.request.get(`${t.BASE}/issues.json?project_id=e2e-project&subject=E2E%20previews`, { headers: e2eApiKey() })).json();
 const att = {};
-for (const a of (await (await t.page.request.get(`${t.BASE}/issues/${issues.issues[0].id}.json?include=attachments`)).json()).issue.attachments) att[a.filename] = a.id;
+for (const a of (await (await t.page.request.get(`${t.BASE}/issues/${issues.issues[0].id}.json?include=attachments`, { headers: e2eApiKey() })).json()).issue.attachments) att[a.filename] = a.id;
 await t.go(`/attachments/${att['sample.odt']}`);
 await t.page.waitForTimeout(2000);
 if (!(await t.page.locator('iframe#preview_frame').count())) t.problems.push('iframe embedding not used');
@@ -71,3 +72,8 @@ await t.go(URL);
 if (!t.page.url().includes('/login')) t.problems.push(`anonymous: ${t.page.url()}`);
 await t.shot('anonymous-login', 'Anonymous is sent to the login page', { full: false });
 await t.done();
+
+// lookups through the manager's API key (test/e2e/seed.rb): a plugin may restrict issue data for a session
+function e2eApiKey() {
+  return { 'X-Redmine-API-Key': fs.readFileSync(`${process.env.REDMINE_DIR}/tmp/e2e-manager-api-key`, 'utf8').trim() };
+}

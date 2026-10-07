@@ -2,14 +2,15 @@
 // sample file of the issue "E2E previews" (test/e2e/seed.rb), with the
 // conversion checked through its own URL (status, type, content).
 import { e2e } from '../../.codex/e2e/lib.mjs';
+import fs from 'node:fs';
 
 const t = await e2e('converters');
 await t.login('manager');
 
-const issues = await (await t.page.request.get(`${t.BASE}/issues.json?project_id=e2e-project&subject=E2E%20previews`)).json();
+const issues = await (await t.page.request.get(`${t.BASE}/issues.json?project_id=e2e-project&subject=E2E%20previews`, { headers: e2eApiKey() })).json();
 const issue = issues.issues[0];
 const att = {};
-for (const a of (await (await t.page.request.get(`${t.BASE}/issues/${issue.id}.json?include=attachments`)).json()).issue.attachments) att[a.filename] = a.id;
+for (const a of (await (await t.page.request.get(`${t.BASE}/issues/${issue.id}.json?include=attachments`, { headers: e2eApiKey() })).json()).issue.attachments) att[a.filename] = a.id;
 
 // The vcard preview links Redmine's application.css; in the sandboxed preview
 // (opaque origin) its web fonts are refused by CORS, the text falls back to a system font.
@@ -77,3 +78,8 @@ const iconCss = await t.page.evaluate(() => document.head.innerHTML.includes('.i
 if (!iconCss) t.problems.push('icon css hook missing');
 await t.shot('issue-attachments', 'The issue with its sample attachments; the plugin adds file-type icons through a CSS hook');
 await t.done();
+
+// lookups through the manager's API key (test/e2e/seed.rb): a plugin may restrict issue data for a session
+function e2eApiKey() {
+  return { 'X-Redmine-API-Key': fs.readFileSync(`${process.env.REDMINE_DIR}/tmp/e2e-manager-api-key`, 'utf8').trim() };
+}
