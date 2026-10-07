@@ -19,8 +19,8 @@ what is left. Written 2026-10-06 from a measured analysis (report at the bottom)
 | GEOxyz runs today | `main` |
 | Upstream | HugoHasenbein/redmine_more_previews main @ 0bca937b36c56e3114e582b9bdf3384814d394ca (2025-02-13, 5.0.9) |
 | Runs on Redmine 7 as is | NEE (boot) |
-| Runs on Redmine 7 after this branch | JA: tests and e2e green on PostgreSQL and MariaDB (see "Results") |
-| Migration session | done 2026-10-06, branch head in `git log`; work list below all done or deferred with reason |
+| Runs on Redmine 7 after this branch | JA: tests and e2e green on PostgreSQL 16 (see "Results"); also with the other GEOxyz plugins, apart from their own defects listed there |
+| Migration session | done 2026-10-06; Jan's decisions of 2026-10-07 built the same day (see "Decided by Jan") |
 | Upstream sync | UPSTREAM DOOD: nothing upstream; fork already equals upstream 5.0.9 + 2 own commits; claude/redmine7-rails8-compat 4eb8dea cherry-picked |
 | After sync | n.v.t. |
 | Complexity (1 trivial .. 5 rewrite) | 3 |
@@ -122,7 +122,9 @@ These GEOxyz commits are on the branch GEOxyz runs today and therefore on this b
 | 7.0-stable-GEOxyz, at `c19f76f` | MariaDB 10.11.14 | 46 runs, 375 assertions, 0 failures, 0 errors, 0 skips |
 | 7.0-stable-GEOxyz + redmine_drawio, view_customize, redmine_wiki_extensions (redmine70-migration) | MariaDB 10.11 | 47 runs, 381 assertions, 0 failures, 0 errors, 0 skips (final test set, `38bc789`: + the Cc test from the review) |
 | 7.0-stable-GEOxyz, final test set at `abdc217` | PostgreSQL 16.15 | 47 runs, 381 assertions, 0 failures, 0 errors, 0 skips |
-| 5.1-stable, Ruby 3.2.6, at `c19f76f` | PostgreSQL 16 | 46 runs, 361 assertions, 0 failures, 0 errors, 0 skips |
+| 7.0-stable-GEOxyz, after Jan's decisions (`8d521d5`) | PostgreSQL 16.15 | 56 runs, 422 assertions, 0 failures, 0 errors, 0 skips |
+| same, with 37 other GEOxyz plugins (all `redmine70-migration`: 30 public, 7 private) | PostgreSQL 16.15 | 56 runs, 422 assertions, 0 failures, 0 errors, 0 skips |
+| (former, 5.1 no longer required) 5.1-stable, Ruby 3.2.6, at `c19f76f` | PostgreSQL 16 | 46 runs, 361 assertions, 0 failures, 0 errors, 0 skips |
 
 Boot and production eager load: OK (the e2e server runs in production mode). Migrations: the plugin
 has none.
@@ -134,9 +136,27 @@ has none.
 | PostgreSQL 16 (`docs/e2e/`) | 15 | 6 | 8 scripts, 46 screenshots | 0 |
 | MariaDB 10.11 (`docs/e2e/mariadb/`) | 15 | 6 | 8 scripts, 46 screenshots | 0 |
 | MariaDB + 3 other GEOxyz plugins (not committed) | 15 | 6 | 8 scripts, 46 screenshots | 0 |
+| PostgreSQL 16 after Jan's decisions (`docs/e2e/`, replaces the run above) | 15 | 6 | 9 scripts, 62 screenshots | 0 |
+| PostgreSQL 16 with 36 other GEOxyz plugins (`docs/e2e/combined/`) | 16 | 6 | 9 scripts, 61 screenshots | 4, none from this plugin (below) |
 | before: GEOxyz `main` on Redmine 5.1 (`docs/e2e/before/`) | - | - | 8 scripts | 65 problems, as expected: traversal LEAK, mail XSS ran, textile 500, JS errors, empty zip downloads |
 
-Every screenshot was opened and looked at. One table per scenario with captions: `docs/e2e/<scenario>.md`.
+Every screenshot was opened and looked at.
+
+**With all GEOxyz plugins (2026-10-07)**, problems that belong to other plugins (for their own
+migration sessions; this plugin's scenarios pass there):
+- `redmine_issue_field_visibility` chains `IssueQuery#initialize_available_filters` with
+  `alias_method` while `redmine_agile` prepends it: `SystemStackError`, the server does not boot
+  (`rake redmine:load_default_data` aborts). The combined e2e run leaves
+  `redmine_issue_field_visibility` out; the combined plugin tests ran with it.
+- Project > Settings answers HTTP 500: `redmine_mail_digest` chains `project_settings_tabs` with
+  `alias_method` (`project_settings_tabs_with_issue_digest`) among a dozen plugins that prepend it
+  ("super: no superclass method"). Seen in `combined/smoke-06.png` and
+  `combined/permissions-module-settings-error.png`; the module switch of the permissions scenario
+  cannot run there.
+- `/issues/1` as `reporter` answers 403: `redmine_view_issue_description` requires its own
+  permission, which the seed's Reporter role lacks; by design of that plugin.
+- The issue JSON API returns no body for a logged-in session with all plugins installed; the
+  scenarios now use the API key. One table per scenario with captions: `docs/e2e/<scenario>.md`.
 
 ### Inventory of functions
 
@@ -159,6 +179,7 @@ Every screenshot was opened and looked at. One table per scenario with captions:
 | Plugin settings: embedding object/iframe, absolute URL, cache, debug, converters, formats, double type warning, help | Administration > Plugins > Configure | settings | settings-*.png |
 | Project module "Redmine More Previews" | Project settings > Modules | permissions | permissions-module-off/on |
 | Permission `use_redmine_more_previews` (public) | member roles | permissions | permissions-reporter |
+| Hand-over of pdf, images, txt, md, textile, html to Redmine (rake task, Jan q3) | `rake redmine_more_previews:use_core_previews` once after the upgrade | core_handover | core_handover-*.png |
 | Converter checks on Administration > Information | Administration > Information | admin_info | admin_info-info |
 | File type icons in attachment lists (CSS hook) | any attachment list | converters | converters-issue-attachments |
 | Refusals: non-member on private project, anonymous, non-admin on settings and info | URL | permissions, settings, admin_info | *-refused, *-anonymous, permissions-outsider-page |
@@ -218,11 +239,26 @@ His choices and notes are quoted verbatim. Nothing is open for this plugin.
 Former open questions 3 (inline previews sanitized) and 6 (previews with `browse_repository`
 alone) were not put to Jan separately; they stay as built and recorded in "Already on this branch".
 
+**Built for the decisions (2026-10-07)**, one commit each, with a test that fails without it:
+
+| decision | commit | test |
+|---|---|---|
+| recorded in this plan, rules updated | `7a9cfb9` | - |
+| prepend instead of alias_method | `5b627bf`: controller filters called through lambdas instead of `alias_method` copies; `Attachment#delete_from_disk!` a prepended module calling `super`; `Redmine::MimeType.css_class_of` prepended | `test/unit/patches_test.rb`, `test_more_preview_runs_core_filters_through_other_plugins_prepends` |
+| no 5.1 code paths | `5a472e3`: `sprite_icon` directly, no version branches in the tests | removal only; `test_preview_page_icons` and the destroy tests cover the behaviour (no test can fail on a removed fallback) |
+| q3 core previews pdf, images, text, md | `8d521d5`: `rake redmine_more_previews:use_core_previews` (`DRY_RUN=1`), run once after the upgrade | `test/unit/core_handover_test.rb` (incl. the rake task), `test_after_the_hand_over_core_previews_pdf_and_the_plugin_keeps_office`, e2e `core_handover` |
+| q1, q2, q4, q5 | recorded only | - |
+
 ## After the upgrade (production)
 
 Actions the person doing the upgrade must take, or know about, for this plugin:
 
-- Review the converter settings: let core handle pdf, images, txt and md; keep libre/cliff/zippy. Install LibreOffice and Ghostscript on the server if kept; core needs Pandoc for its own Office preview.
+- Hand pdf, images, text, md and textile back to Redmine, and switch pass and mark-html off (Jan,
+  2026-10-07, q3 "Advies volgen"), once, after the deploy:
+  `RAILS_ENV=production bundle exec rake redmine_more_previews:use_core_previews`
+  (first with `DRY_RUN=1` to see the list; a second run reports "Nothing to change"). Libre,
+  cliff, zippy and vince stay as configured. Install LibreOffice on the server for libre; core
+  needs Pandoc for its own Office preview and for mark.
 - Empty the preview cache once after deploying: `rm -rf <redmine>/tmp/more_previews/*`. Cached zip
   tables from before still carry the double-encoded links, and repository previews moved to a new
   layout (by repository id and revision; the old directories are never read again).
