@@ -1,4 +1,3 @@
-gem 'marcel'
 
 #
 # Load plugins' Gemfiles
