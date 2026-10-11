@@ -293,7 +293,9 @@ Actions the person doing the upgrade must take, or know about, for this plugin:
   the same identifier; Redmine 7 builds them on demand in `repository/gits/<id>/<revision>/<path>`.
   Identifiers cannot be all digits, so the two do not meet, but the old files are never read again).
   Simplest is the next step, which empties the whole cache.
-- If Maggie stays in use (it is off after the hand-over task): Ghostscript 10.03.1 or later, and in
+- If Maggie stays in use (it is off after the hand-over task): Ghostscript 10.03.1 or later, or a
+  distribution package with its -dSAFER fixes backported (Ubuntu 24.04: `10.02.1~dfsg1-0ubuntu7.9`
+  carries CVE-2024-29510 and later, while `gs --version` still prints 10.02.1), and in
   ImageMagick's `policy.xml` the coders PS, PS2, PS3, EPS, EPI, EPSI, EPSF, MVG, MSL, TEXT, URL, HTTP,
   HTTPS and FTP disabled (from curecodejp's README; they do not stop PostScript reaching Ghostscript
   through the PDF coder, which Maggie's start-of-file check does).
