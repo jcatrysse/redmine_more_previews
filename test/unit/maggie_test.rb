@@ -39,6 +39,7 @@ class MaggieTest < ActiveSupport::TestCase
   end
 
   def test_a_hostile_file_name_cannot_steer_imagemagick
+    Redmine::Thumbnail.stubs(:gs_available?).returns(true)
     ['|touch pwned.pdf', '-write x.pdf'].each do |name|
       cmd = commands_for(name, PDF).join
       assert_include "'png:./out.png'", cmd

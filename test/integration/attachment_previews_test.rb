@@ -107,6 +107,7 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
       get "/attachments/more_preview/#{png.id}/index.jpg"
       assert_response :success
       assert response.body.b.start_with?("\xFF\xD8".b), 'a JPEG'
+      skip 'Ghostscript is not available' unless Redmine::Thumbnail.gs_available?
       get "/attachments/more_preview/#{pdf.id}/index.png"
       assert_response :success
       assert response.body.b.start_with?("\x89PNG".b), 'a PNG of the first page'
