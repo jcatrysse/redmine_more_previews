@@ -77,6 +77,19 @@ repository.url = repository.root_url = File.join(repo_dir, '.git') # git wants t
 repository.save!
 repository.fetch_changesets
 
+# 'viewer': member of e2e-project with a role that may view changesets but not browse the
+# repository (repository previews need browse_repository, Jan 2026-10-11)
+changesets_role = Role.find_by(name: 'E2E changesets only') || Role.new(name: 'E2E changesets only')
+changesets_role.permissions = %i(view_issues view_changesets)
+changesets_role.save!
+viewer = User.find_by(login: 'viewer') ||
+         User.new(login: 'viewer', firstname: 'Viewer', lastname: 'E2E', mail: 'viewer@example.net')
+viewer.password = viewer.password_confirmation = ENV.fetch('RMP_USER_PASSWORD', ENV.fetch('RMP_ADMIN_PASSWORD', 'Redmine7Test!'))
+viewer.must_change_passwd = false
+viewer.status = User::STATUS_ACTIVE
+viewer.save!(validate: false)
+Member.create!(principal: viewer, project: project, roles: [changesets_role]) unless Member.where(user_id: viewer.id, project_id: project.id).exists?
+
 # for scenarios that upload through the REST API
 File.write(Rails.root.join('tmp', 'e2e-manager-api-key'), User.find_by!(login: 'manager').api_key)
 
