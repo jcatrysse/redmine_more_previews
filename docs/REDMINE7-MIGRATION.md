@@ -289,9 +289,10 @@ Actions the person doing the upgrade must take, or know about, for this plugin:
   cliff, zippy and vince stay as configured. Install LibreOffice on the server for libre; core
   needs Pandoc for its own Office preview and for mark.
 - Remove the 5.1 repository preview cache once: `rm -rf <redmine>/tmp/more_previews/repository`
-  (5.1 kept repository previews below `repository/` per identifier, shared between projects; Redmine 7
-  builds them on demand below `repository/gits/...` by repository id and revision). Simplest is
-  the next step, which empties the whole cache.
+  (5.1 kept repository previews in `repository/gits/<identifier>/<path>`, shared between projects with
+  the same identifier; Redmine 7 builds them on demand in `repository/gits/<id>/<revision>/<path>`.
+  Identifiers cannot be all digits, so the two do not meet, but the old files are never read again).
+  Simplest is the next step, which empties the whole cache.
 - If Maggie stays in use (it is off after the hand-over task): Ghostscript 10.03.1 or later, and in
   ImageMagick's `policy.xml` the coders PS, PS2, PS3, EPS, EPI, EPSI, EPSF, MVG, MSL, TEXT, URL, HTTP,
   HTTPS and FTP disabled (from curecodejp's README; they do not stop PostScript reaching Ghostscript

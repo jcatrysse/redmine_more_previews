@@ -31,7 +31,7 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
 
   def teardown
     FileUtils.rm_rf(@dir) if @dir
-    FileUtils.rm_rf(File.join(RedmineMorePreviews::Constants::Defaults::MORE_PREVIEWS_STORAGE_PATH, 'repositories'))
+    FileUtils.rm_rf(File.join(RedmineMorePreviews::Constants::Defaults::MORE_PREVIEWS_STORAGE_PATH, 'repository'))
   end
 
   def test_entry_renders_the_preview_page
