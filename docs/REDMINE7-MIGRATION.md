@@ -20,7 +20,7 @@ what is left. Written 2026-10-06 from a measured analysis (report at the bottom)
 | Upstream | HugoHasenbein/redmine_more_previews main @ 0bca937b36c56e3114e582b9bdf3384814d394ca (2025-02-13, 5.0.9) |
 | Runs on Redmine 7 as is | NEE (boot) |
 | Runs on Redmine 7 after this branch | JA: tests and e2e green on PostgreSQL 16 (see "Results"); also with the other GEOxyz plugins, apart from their own defects listed there |
-| Migration session | done 2026-10-06; Jan's decisions of 2026-10-07 built the same day (see "Decided by Jan") |
+| Migration session | done 2026-10-06; Jan's decisions of 2026-10-07 and round 4 (2026-10-11) built (see "Decided by Jan") |
 | Upstream sync | UPSTREAM DOOD: nothing upstream; fork already equals upstream 5.0.9 + 2 own commits; claude/redmine7-rails8-compat 4eb8dea cherry-picked |
 | After sync | n.v.t. |
 | Complexity (1 trivial .. 5 rewrite) | 3 |
@@ -124,6 +124,8 @@ These GEOxyz commits are on the branch GEOxyz runs today and therefore on this b
 | 7.0-stable-GEOxyz, final test set at `abdc217` | PostgreSQL 16.15 | 47 runs, 381 assertions, 0 failures, 0 errors, 0 skips |
 | 7.0-stable-GEOxyz, after Jan's decisions (`8d521d5`) | PostgreSQL 16.15 | 56 runs, 422 assertions, 0 failures, 0 errors, 0 skips |
 | same, with 37 other GEOxyz plugins (all `redmine70-migration`: 30 public, 7 private) | PostgreSQL 16.15 | 56 runs, 422 assertions, 0 failures, 0 errors, 0 skips |
+| 7.0-stable-GEOxyz, after round 4 (`5f38162`) | PostgreSQL 16.15 | 62 runs, 466 assertions, 0 failures, 0 errors, 0 skips |
+| same, with the 37 other GEOxyz plugins (heads of 2026-10-11) | PostgreSQL 16.15 | 62 runs, 466 assertions, 0 failures, 0 errors, 0 skips |
 | (former, 5.1 no longer required) 5.1-stable, Ruby 3.2.6, at `c19f76f` | PostgreSQL 16 | 46 runs, 361 assertions, 0 failures, 0 errors, 0 skips |
 
 Boot and production eager load: OK (the e2e server runs in production mode). Migrations: the plugin
@@ -137,12 +139,18 @@ has none.
 | MariaDB 10.11 (`docs/e2e/mariadb/`) | 15 | 6 | 8 scripts, 46 screenshots | 0 |
 | MariaDB + 3 other GEOxyz plugins (not committed) | 15 | 6 | 8 scripts, 46 screenshots | 0 |
 | PostgreSQL 16 after Jan's decisions (`docs/e2e/`, replaces the run above) | 15 | 6 | 9 scripts, 62 screenshots | 0 |
-| PostgreSQL 16 with 36 other GEOxyz plugins (`docs/e2e/combined/`) | 16 | 6 | 9 scripts, 61 screenshots | 4, none from this plugin (below) |
+| PostgreSQL 16 after round 4 (`docs/e2e/`, current) | 15 | 6 | 11 scripts, 77 screenshots | 0 |
+| PostgreSQL 16 with all 37 other GEOxyz plugins, round 4 (`docs/e2e/combined/`, current) | 16 | 6 | 11 scripts, 77 screenshots | 1, not from this plugin (redmine_view_issue_description's 403) |
+| (2026-10-07) PostgreSQL 16 with 36 other GEOxyz plugins | 16 | 6 | 9 scripts, 61 screenshots | 4, none from this plugin (below) |
 | before: GEOxyz `main` on Redmine 5.1 (`docs/e2e/before/`) | - | - | 8 scripts | 65 problems, as expected: traversal LEAK, mail XSS ran, textile 500, JS errors, empty zip downloads |
 
 Every screenshot was opened and looked at.
 
-**With all GEOxyz plugins (2026-10-07)**, problems that belong to other plugins (for their own
+**With all GEOxyz plugins (2026-10-11)**: the server boots with all 37 and Project > Settings
+answers 200; the defects of 2026-10-07 below are fixed in those plugins' branches. Left: the
+403 of `redmine_view_issue_description` (by design).
+
+**With all GEOxyz plugins (2026-10-07)**, problems that belonged to other plugins (for their own
 migration sessions; this plugin's scenarios pass there):
 - `redmine_issue_field_visibility` chains `IssueQuery#initialize_available_filters` with
   `alias_method` while `redmine_agile` prepends it: `SystemStackError`, the server does not boot
@@ -179,6 +187,8 @@ migration sessions; this plugin's scenarios pass there):
 | Plugin settings: embedding object/iframe, absolute URL, cache, debug, converters, formats, double type warning, help | Administration > Plugins > Configure | settings | settings-*.png |
 | Project module "Redmine More Previews" | Project settings > Modules | permissions | permissions-module-off/on |
 | Permission `use_redmine_more_previews` (public) | member roles | permissions | permissions-reporter |
+| Repository previews and assets need "Browse repository" (round 4) | repository file as viewer / reporter / outsider / anonymous | repository_permissions | repository_permissions-*.png |
+| Maggie refuses a disguised PDF, converts real PDF and PNG (round 4) | attachment preview with Maggie on | maggie | maggie-*.png |
 | Hand-over of pdf, images, txt, md, textile, html to Redmine (rake task, Jan q3) | `rake redmine_more_previews:use_core_previews` once after the upgrade | core_handover | core_handover-*.png |
 | Converter checks on Administration > Information | Administration > Information | admin_info | admin_info-info |
 | File type icons in attachment lists (CSS hook) | any attachment list | converters | converters-issue-attachments |
@@ -249,6 +259,25 @@ alone) were not put to Jan separately; they stay as built and recorded in "Alrea
 | q3 core previews pdf, images, text, md | `8d521d5`: `rake redmine_more_previews:use_core_previews` (`DRY_RUN=1`), run once after the upgrade | `test/unit/core_handover_test.rb` (incl. the rake task), `test_after_the_hand_over_core_previews_pdf_and_the_plugin_keeps_office`, e2e `core_handover` |
 | q1, q2, q4, q5 | recorded only | - |
 
+**Round 4, 2026-10-11: security fixes of curecodejp/redmine_more_previews v6.1.1** (Jan's decision
+in `docs/DECISIONS-2026-10-07.md`, section "Round 4"; ported by hand, the upstream commit named
+in each commit):
+
+| upstream fix | Jan | here | test |
+|---|---|---|---|
+| 97f33d5 repository previews need `browse_repository` | port | `afe995a`: init.rb registers `repositories/more_preview` and `more_asset` under `browse_repository` only (view_changesets covers revisions, not file content) | `test_more_preview_and_asset_are_refused_with_view_changesets_alone` (200 with the file before); e2e `repository_permissions` |
+| e58d928 Maggie only hands files to ImageMagick as their own type | port, Maggie part | `5f38162`: PDF must pass `Redmine::Thumbnail.valid_pdf_magic?`; inputs with their coder (`jpeg:`, `png:`, `gif:`, `bmp:`, `pdf:`); fixed output `out.<format>`; `-limit` before the input | `test/unit/maggie_test.rb`, `test_maggie_still_converts_a_png_and_a_pdf`; e2e `maggie` |
+| ad8db89 Peek checks the PDF | not ported | Peek uses `Redmine::Thumbnail.generate`, which checks the start of a PDF on Redmine 7 | - |
+| a3b07ae, 762bf11 repository cache per repository and content | not ported, recorded | already closed by `9088fd0` (repository id + revision the entry last changed in) | see below |
+| Zippy `rev` parameter, Redmine 6 icon CSS | seen, not needed | the repository links are built from the request (`20bdf3d`); icons are `sprite_icon` | - |
+
+Known limitations, not defects (recorded with Jan's round-4 decision): a repository without
+revisions (Filesystem) or without fetched changesets can keep a stale preview, because the cache key
+then falls back to the requested revision; the 5.1 cache below `repository/` stays on disk, unread
+(removed once after the upgrade, see there). Maggie without Ghostscript copies a valid PDF under the
+image name (pre-existing, upstream does the same; the response is sandboxed): GEOxyz installs
+Ghostscript, and Maggie is off after the hand-over task.
+
 ## After the upgrade (production)
 
 Actions the person doing the upgrade must take, or know about, for this plugin:
@@ -259,6 +288,14 @@ Actions the person doing the upgrade must take, or know about, for this plugin:
   (first with `DRY_RUN=1` to see the list; a second run reports "Nothing to change"). Libre,
   cliff, zippy and vince stay as configured. Install LibreOffice on the server for libre; core
   needs Pandoc for its own Office preview and for mark.
+- Remove the 5.1 repository preview cache once: `rm -rf <redmine>/tmp/more_previews/repository`
+  (5.1 kept repository previews below `repository/` per identifier, shared between projects; Redmine 7
+  builds them on demand below `repository/gits/...` by repository id and revision). Simplest is
+  the next step, which empties the whole cache.
+- If Maggie stays in use (it is off after the hand-over task): Ghostscript 10.03.1 or later, and in
+  ImageMagick's `policy.xml` the coders PS, PS2, PS3, EPS, EPI, EPSI, EPSF, MVG, MSL, TEXT, URL, HTTP,
+  HTTPS and FTP disabled (from curecodejp's README; they do not stop PostScript reaching Ghostscript
+  through the PDF coder, which Maggie's start-of-file check does).
 - Empty the preview cache once after deploying: `rm -rf <redmine>/tmp/more_previews/*`. Cached zip
   tables from before still carry the double-encoded links, and repository previews moved to a new
   layout (by repository id and revision; the old directories are never read again).
