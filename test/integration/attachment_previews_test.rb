@@ -99,6 +99,20 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  def test_maggie_still_converts_a_png_and_a_pdf
+    png = preview_attachment(@issue, 'sample.png')
+    pdf = preview_attachment(@issue, 'sample.pdf')
+    with_converters(:maggie => { :png => :jpg, :pdf => :png }) do
+      log_user('jsmith', 'jsmith')
+      get "/attachments/more_preview/#{png.id}/index.jpg"
+      assert_response :success
+      assert response.body.b.start_with?("\xFF\xD8".b), 'a JPEG'
+      get "/attachments/more_preview/#{pdf.id}/index.png"
+      assert_response :success
+      assert response.body.b.start_with?("\x89PNG".b), 'a PNG of the first page'
+    end
+  end
+
   def test_more_preview_returns_the_conversion
     attachment = preview_attachment(@issue, 'sample.txt')
     with_converters(CONVERTERS) do
