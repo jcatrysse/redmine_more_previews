@@ -1,6 +1,6 @@
 # smoke
 
-Run 2026-10-07T16:34:52.035Z against http://127.0.0.1:3000.
+Run 2026-10-11T09:29:58.656Z against http://127.0.0.1:3000.
 
 | screenshot | user | URL | shows |
 |---|---|---|---|
@@ -9,7 +9,7 @@ Run 2026-10-07T16:34:52.035Z against http://127.0.0.1:3000.
 | ![](smoke-03.png) | admin | `/projects/e2e-project/issues` | /projects/e2e-project/issues (HTTP 200) |
 | ![](smoke-04.png) | admin | `/issues/1` | /issues/1 (HTTP 200) |
 | ![](smoke-05.png) | admin | `/projects/e2e-project/issues/new` | /projects/e2e-project/issues/new (HTTP 200) |
-| ![](smoke-06.png) | admin | `/projects/e2e-project/settings` | /projects/e2e-project/settings (HTTP 500) |
+| ![](smoke-06.png) | admin | `/projects/e2e-project/settings` | /projects/e2e-project/settings (HTTP 200) |
 | ![](smoke-07.png) | admin | `/my/page` | /my/page (HTTP 200) |
 | ![](smoke-08.png) | admin | `/my/account` | /my/account (HTTP 200) |
 | ![](smoke-09.png) | admin | `/admin` | /admin (HTTP 200) |
@@ -20,7 +20,3 @@ Run 2026-10-07T16:34:52.035Z against http://127.0.0.1:3000.
 | ![](smoke-14.png) | admin | `/admin/info` | /admin/info (HTTP 200) |
 | ![](smoke-15.png) | admin | `/attachments/1/1/1/1` | /attachments/1/1/1/1 (HTTP 404) |
 | ![](smoke-16.png) | admin | `/attachments/more_preview/1/index` | /attachments/more_preview/1/index (HTTP 404) |
-
-## Problems
-
-- /projects/e2e-project/settings: HTTP 500
