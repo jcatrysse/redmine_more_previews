@@ -144,6 +144,29 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  def test_more_preview_and_asset_are_refused_with_view_changesets_alone
+    # file content needs browse_repository in core (entry, raw); so do the previews
+    Role.find(1).remove_permission!(:browse_repository)
+    assert Role.find(1).has_permission?(:view_changesets)
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get '/projects/ecookbook/repository/samples/preview/docs/sample.txt@/index.txt'
+      assert_response :forbidden
+      get '/projects/ecookbook/repository/samples/preview/sample.zip@inner/hello.txt'
+      assert_response :forbidden
+      assert_not_include 'hello inner', response.body
+    end
+  end
+
+  def test_more_asset_is_allowed_with_browse_repository
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get '/projects/ecookbook/repository/samples/preview/sample.zip@inner/hello.txt'
+      assert_response :success
+      assert_equal "hello inner\n", response.body
+    end
+  end
+
   def test_more_preview_needs_a_repository_permission
     Role.find(1).remove_permission!(:view_changesets)
     Role.find(1).remove_permission!(:browse_repository)

@@ -185,9 +185,9 @@ end
 # Add permissions
 #-----------------------------------------------------------------------------------------
 Rails.application.config.after_initialize do
-  [ [:view_changesets,   "repositories/more_preview"],
-    [:view_changesets,   "repositories/more_asset"],
-    [:browse_repository, "repositories/more_preview"],
+  # the previews show the content of a file, as core's entry and raw actions do,
+  # which need browse_repository; view_changesets covers revisions only
+  [ [:browse_repository, "repositories/more_preview"],
     [:browse_repository, "repositories/more_asset"]
   ].each do |permission, action|
     RedmineMorePreviews::Lib::RmpPerm.push_permission(permission, action)
