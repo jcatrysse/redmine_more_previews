@@ -155,6 +155,29 @@ module RedmineMorePreviews
           path.split(/[\/\\]/).none? { |segment| segment == ".." }
         end #def
         
+        # ------------------------------------------------------------------------------ #
+        # within_directory?( base(string), path(string) )
+        # returns true if path (after resolving ".." and symlinks of existing parts)
+        # lies strictly below base. Non-existing parts of path are resolved lexically.
+        #
+        def within_directory?( base, path )
+          return false unless File.directory?(base)
+          _base = File.realpath(base)
+          _path = realpath_lexical(path)
+          _path.start_with?(_base + File::SEPARATOR)
+        end #def
+        
+        # resolves symlinks of the existing part of path, appends the rest lexically
+        def realpath_lexical( path )
+          existing, rest = File.expand_path(path), []
+          until File.exist?(existing) || existing == File.dirname(existing)
+            rest.unshift(File.basename(existing))
+            existing = File.dirname(existing)
+          end
+          File.join(File.realpath(existing), *rest)
+        end #def
+        private :realpath_lexical
+        
         #-----------------------------------------------------------------------------------
         # get directory, if it does not exist, create directory
         #-----------------------------------------------------------------------------------

@@ -34,6 +34,12 @@ es:
   label_use_cache:                                         "Cache"
   text_more_previews_cache:                                "Caching de la vista previa creada"
   text_help_redmine_more_previews_cache:                   "El almacenamiento en caché hace que la repetición de vistas previas sea mucho más rápida, pero puede inflar el directorio /tmp en el directorio raíz de Redmine."
+  text_more_previews_limits:                             "Límites de conversión"
+  label_conversion_timeout:                              "Límite de tiempo (segundos)"
+  label_lock_timeout:                                    "Límite de espera (segundos)"
+  label_max_conversions:                                 "Conversiones simultáneas"
+  text_help_redmine_more_previews_limits:                "Una conversión que dure más que el límite de tiempo se detiene junto con todos los programas que inició (Libre recibe al menos 120 segundos). Una petición recibe 503 (inténtelo más tarde) cuando todas las conversiones, contadas en todos los procesos de Redmine, están ocupadas, o cuando espera más que el límite de espera una vista previa que se está generando."
+  text_more_previews_busy:                               "La vista previa se está generando o el servidor está ocupado. Inténtelo de nuevo más tarde."
   
   label_redmine_more_previews_plugins_settings:            "Configuración de los plugins"
   

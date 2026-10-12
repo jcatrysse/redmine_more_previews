@@ -33,6 +33,7 @@ module RedmineMorePreviews
           # a lambda, see AttachmentsControllerPatch
           before_action -> { find_project_repository },    :only => [:more_asset, :more_preview ]
           before_action :find_path_param,                          :only => [:more_asset, :more_preview ]
+          rescue_from   RedmineMorePreviews::Exceptions::ConverterLockTimeOut, :with => :render_more_preview_busy
           
           ################################################################################
           #
@@ -90,7 +91,10 @@ module RedmineMorePreviews
             sandbox_preview Rack::Mime.mime_type(".#{params[:format]}")
             if !params[:unsafe] && RedmineMorePreviews::Converter.cache_previews?
               if params[:reload] || stale?(:etag => @repository.preview_mtime(@path, @rev, preview_params))
-                send_data @repository.more_preview(@path, @rev, preview_params),
+                # nil: the conversion failed or timed out (see Conversion#preview)
+                data = @repository.more_preview(@path, @rev, preview_params)
+                return render_404 if data.nil?
+                send_data data,
                   :filename    => filename_for_content_disposition( @repository.preview_filename(@path, @rev, preview_params) ),
                   :type        => Rack::Mime.mime_type(".#{params[:format]}"),
                   :disposition => 'inline'
@@ -102,6 +106,8 @@ module RedmineMorePreviews
                    :type        => Rack::Mime.mime_type(".#{params[:format]}"),
                    :disposition => 'inline'
               end
+              # the conversion failed or timed out: nothing was yielded
+              render_404 unless performed?
             end
           end #def
           private :send_more_preview

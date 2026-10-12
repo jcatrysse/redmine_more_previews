@@ -34,6 +34,12 @@ de:
   label_use_cache:                                         "Cache"
   text_more_previews_cache:                                "Caching des erzeugten Previews"
   text_help_redmine_more_previews_cache:                   "Caching macht die wiederholte Anzeige von Previews deutlich schneller, kann aber das /tmp-Verzeichnis im Root-Verzeichnis von Redmine aufblähen."
+  text_more_previews_limits:                             "Grenzen der Konvertierung"
+  label_conversion_timeout:                              "Zeitlimit (Sekunden)"
+  label_lock_timeout:                                    "Wartezeit (Sekunden)"
+  label_max_conversions:                                 "Gleichzeitige Konvertierungen"
+  text_help_redmine_more_previews_limits:                "Eine Konvertierung, die länger als das Zeitlimit läuft, wird mit allen Programmen, die sie gestartet hat, beendet (Libre erhält mindestens 120 Sekunden). Eine Anfrage wird mit 503 (später erneut versuchen) beantwortet, wenn alle Konvertierungen, über alle Redmine-Prozesse gezählt, belegt sind oder wenn sie länger als die Wartezeit auf ein Preview wartet, das gerade erzeugt wird."
+  text_more_previews_busy:                               "Das Preview wird gerade erzeugt oder der Server ist ausgelastet. Bitte später erneut versuchen."
   
   label_redmine_more_previews_plugins_settings:            "Plugins Einstellungen"
   

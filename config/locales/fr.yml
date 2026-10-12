@@ -34,6 +34,12 @@ fr:
   label_use_cache:                                         "Cache"
   text_more_previews_cache:                                "Mise en cache de l'aperçu généré"
   text_help_redmine_more_previews_cache:                   "La mise en cache rend l'affichage répété des prévisualisations beaucoup plus rapide, mais peut gonfler le répertoire /tmp dans le répertoire racine de Redmine."
+  text_more_previews_limits:                             "Limites de conversion"
+  label_conversion_timeout:                              "Limite de temps (secondes)"
+  label_lock_timeout:                                    "Limite d'attente (secondes)"
+  label_max_conversions:                                 "Conversions simultanées"
+  text_help_redmine_more_previews_limits:                "Une conversion qui dure plus longtemps que la limite de temps est arrêtée avec tous les programmes qu'elle a lancés (Libre dispose d'au moins 120 secondes). Une requête reçoit 503 (réessayer plus tard) lorsque toutes les conversions, comptées sur tous les processus Redmine, sont occupées, ou lorsqu'elle attend plus longtemps que la limite d'attente un aperçu en cours de génération."
+  text_more_previews_busy:                               "L'aperçu est en cours de génération ou le serveur est occupé. Veuillez réessayer plus tard."
   
   label_redmine_more_previews_plugins_settings:            "Configuration des plugins"
   

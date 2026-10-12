@@ -31,6 +31,18 @@ module RedmineMorePreviews
              :format  => params[:format]&.downcase}.compact )
     end #def
     private :preview_params
+
+    # seconds after which a client may ask again for a preview that was busy
+    BUSY_RETRY_AFTER = 10
+
+    # no conversion slot or lock became free in time (see Conversion#wait_for):
+    # the preview is being converted, or too many are. Nothing was converted, a
+    # later request can succeed.
+    def render_more_preview_busy(exception)
+      response.headers['Retry-After'] = BUSY_RETRY_AFTER.to_s
+      render :plain => l(:text_more_previews_busy), :status => 503, :content_type => 'text/plain'
+    end
+    private :render_more_preview_busy
     
     # Previews and assets are converted user files served from Redmine's origin.
     # Sandbox them, so that a script in a converted html, svg or mail cannot act

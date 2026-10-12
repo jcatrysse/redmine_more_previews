@@ -34,6 +34,12 @@ zh:
   label_use_cache:                                         "缓存"
   text_more_previews_cache:                                "缓存创建的预览"
   text_help_redmine_more_previews_cache:                   "缓存使重复查看预览的速度大大加快，但可能会使Redmine根目录中的/tmp-目录膨胀。"
+  text_more_previews_limits:                             "转换限制"
+  label_conversion_timeout:                              "时间限制（秒）"
+  label_lock_timeout:                                    "等待限制（秒）"
+  label_max_conversions:                                 "同时进行的转换数"
+  text_help_redmine_more_previews_limits:                "运行时间超过时间限制的转换会连同其启动的所有程序一起停止（Libre 至少有 120 秒）。当所有转换（按所有 Redmine 进程计算）都被占用，或者等待正在生成的预览超过等待限制时，请求将得到 503（稍后重试）。"
+  text_more_previews_busy:                               "预览正在生成或服务器繁忙。请稍后重试。"
   
   label_redmine_more_previews_plugins_settings:            "插件设置"
   
