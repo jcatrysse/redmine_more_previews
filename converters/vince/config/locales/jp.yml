@@ -89,3 +89,4 @@ jp:
   redmine_more_previews:
     vince:
       text_explanation:   "vcfファイル（電子名刺）のプレビュー"
+      label_iconize:      "アイコン化"

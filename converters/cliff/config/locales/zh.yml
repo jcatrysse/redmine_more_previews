@@ -28,4 +28,9 @@ zh:
   
   redmine_more_previews:
     cliff:
-      text_explanation:                          "预览互联网邮件文件"  
+      text_explanation:                          "预览互联网邮件文件"
+      label_max_size:                            "最大邮件 (MiB)"
+      label_max_parts:                           "最多 MIME 部分"
+      label_max_attachments:                     "最多显示的附件"
+      text_help_limits:                          "超过此大小或 MIME 部分更多的邮件不预览。超出限制的附件只在列表中计数，不会提取。"
+      text_more_attachments:                     "以及另外 %{count} 个附件"
