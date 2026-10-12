@@ -343,14 +343,27 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  # reload and unsafe are for administrators only (Jan 2026-10-12, port of curecodejp 03f140f)
   def test_preview_page_icons
+    attachment = preview_attachment(@issue, 'sample.eml')
+    with_converters(CONVERTERS) do
+      log_user('admin', 'admin')
+      get "/attachments/#{attachment.id}"
+      assert_response :success
+      assert_select 'a.icon-reload svg use[href*=?]', 'icon--reload'
+      assert_select 'a.icon-warning svg use[href*=?]', 'icon--warning'
+    end
+  end
+
+  def test_reload_and_unsafe_links_are_not_shown_to_other_users
     attachment = preview_attachment(@issue, 'sample.eml')
     with_converters(CONVERTERS) do
       log_user('jsmith', 'jsmith')
       get "/attachments/#{attachment.id}"
       assert_response :success
-      assert_select 'a.icon-reload svg use[href*=?]', 'icon--reload'
-      assert_select 'a.icon-warning svg use[href*=?]', 'icon--warning'
+      assert_select '#preview_pane'
+      assert_select 'a.icon-reload', 0
+      assert_select 'a.icon-warning', 0
     end
   end
 

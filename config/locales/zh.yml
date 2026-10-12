@@ -41,7 +41,8 @@ zh:
   label_max_repository_file:                             "最大版本库文件 (MiB)"
   label_max_output:                                      "最大提供的预览 (MiB)"
   label_max_cache:                                       "缓存大小 (MiB)"
-  text_help_redmine_more_previews_limits:                "运行时间超过时间限制的转换会连同其启动的所有程序一起停止（Libre 至少有 120 秒）。当所有转换（按所有 Redmine 进程计算）都被占用，或者等待正在生成的预览超过等待限制时，请求将得到 503（稍后重试）。超过限制的版本库文件或预览以 413 应答。缓存超过其大小后，新的预览在每次请求时转换，不再保存。"
+  label_failure_ttl:                                     "失败记住时长 (分钟)"
+  text_help_redmine_more_previews_limits:                "运行时间超过时间限制的转换会连同其启动的所有程序一起停止（Libre 至少有 120 秒）。当所有转换（按所有 Redmine 进程计算）都被占用，或者等待正在生成的预览超过等待限制时，请求将得到 503（稍后重试）。超过限制的版本库文件或预览以 413 应答。缓存超过其大小后，新的预览在每次请求时转换，不再保存。失败的转换在被记住期间不会重试，直到管理员重新加载预览。重新加载和邮件的不安全预览仅限管理员。"
   text_more_previews_busy:                               "预览正在生成或服务器繁忙。请稍后重试。"
   text_more_previews_too_large:                          "文件太大，无法预览。"
   

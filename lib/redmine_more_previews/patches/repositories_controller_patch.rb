@@ -90,8 +90,8 @@ module RedmineMorePreviews
           ################################################################################
           def send_more_preview
             sandbox_preview Rack::Mime.mime_type(".#{params[:format]}")
-            if !params[:unsafe] && RedmineMorePreviews::Converter.cache_previews?
-              if params[:reload] || stale?(:etag => @repository.preview_mtime(@path, @rev, preview_params))
+            if !preview_unsafe? && RedmineMorePreviews::Converter.cache_previews?
+              if preview_reload? || stale?(:etag => @repository.preview_mtime(@path, @rev, preview_params))
                 # nil: the conversion failed or timed out (see Conversion#preview)
                 data = @repository.more_preview(@path, @rev, preview_params)
                 return render_404 if data.nil?
@@ -115,9 +115,12 @@ module RedmineMorePreviews
           
           def send_more_asset
             sandbox_preview Rack::Mime.mime_type( File.extname(@asset) )
-            if !params[:unsafe] && RedmineMorePreviews::Converter.cache_previews?
-              if params[:reload] || stale?(:etag => @repository.asset_mtime(@path, @rev, preview_params))
-                send_data @repository.more_asset(@path, @rev, preview_params),
+            if !preview_unsafe? && RedmineMorePreviews::Converter.cache_previews?
+              if preview_reload? || stale?(:etag => @repository.asset_mtime(@path, @rev, preview_params))
+                # nil: the archive has no such entry, or its conversion failed
+                data = @repository.more_asset(@path, @rev, preview_params)
+                return render_404 if data.nil?
+                send_data data,
                   :filename    => filename_for_content_disposition( File.basename(@asset) ),
                   :type        => Rack::Mime.mime_type( File.extname(@asset) ),
                   :disposition => @disposition || 'inline'
