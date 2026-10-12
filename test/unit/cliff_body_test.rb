@@ -83,10 +83,12 @@ class CliffBodyTest < ActiveSupport::TestCase
   # cliff ships a second copy of its templates next to the library, and that is
   # the one a packaged install renders; escaping only one of them would leave
   # the exposure in place where it is hardest to notice
-  def test_bundled_pre_template_copy_is_in_sync
-    app = File.expand_path('../../converters/cliff/app/views/cliff/pre.html.erb', __dir__)
-    lib = File.expand_path('../../converters/cliff/lib/cliff/pre.html.erb', __dir__)
-    assert_equal File.read(app), File.read(lib)
+  def test_bundled_template_copies_are_in_sync
+    %w(pre headers fields attachments).each do |name|
+      app = File.expand_path("../../converters/cliff/app/views/cliff/#{name}.html.erb", __dir__)
+      lib = File.expand_path("../../converters/cliff/lib/cliff/#{name}.html.erb", __dir__)
+      assert_equal File.read(app), File.read(lib), name
+    end
   end
 
   # an html message is html by definition: that part is rendered, not escaped,
