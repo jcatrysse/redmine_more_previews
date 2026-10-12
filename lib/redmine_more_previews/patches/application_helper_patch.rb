@@ -38,6 +38,26 @@ module RedmineMorePreviews
             )
           end #def
           
+          # query parameters the preview views may forward to the converters.
+          # asset / assets select an archive entry and are only meaningful for
+          # asset requests; forwarded from the preview page they made the inline
+          # preview ask for the entry instead of the listing (nil once cached).
+          def preview_query_parameters
+            request.query_parameters.except('asset', 'assets')
+          end
+          
+          # options of an inline preview, converted while the page is rendered.
+          # reload takes effect for administrators only, as for a preview request
+          # (see ControllerHelper#preview_reload?); unsafe never does: it converts
+          # without the cache and so needs a block, which the cached view has not
+          def inline_preview_options
+            preview_query_parameters.except('reload', 'unsafe').symbolize_keys.merge(
+              :format  => "inline",
+              :request => request,
+              :reload  => params[:reload].present? && User.current.admin?
+            )
+          end
+          
           def more_previews_tag(path, filename, options={})
           
             if RedmineMorePreviews::Converter.embed?
