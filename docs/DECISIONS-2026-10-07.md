@@ -101,3 +101,76 @@ your own adversarial review and `./.codex/openai_review.sh` when
 OPENAI_API_KEY is set, every finding with a Resolution line; update Status,
 inventory and "After the upgrade"; push after every commit; end with a short
 report in Dutch. These decisions are final; do not stop to ask about them.
+
+## Round 5, 2026-10-12: security fixes from curecodejp/redmine_more_previews v6.1.2
+
+Jan decided (2026-10-12) to port all security fixes of
+https://github.com/curecodejp/redmine_more_previews/releases/tag/v6.1.2 to
+`redmine70-migration` (option "Alles porten"). Same fork situation as round 4:
+GPL-2, no shared history after 5.0.9, port by hand, name the upstream commits in
+each commit message.
+
+1. Conversion limits, GHSA-mq93-c4mm-98v3 (upstream GHSA merge 4089919, 60 files). PORT IN FULL.
+   Why it matters for GEOxyz: the plugin keeps Libre, Cliff, Zippy and Vince after
+   the core hand-over, and those are the converters this fix bounds. Measured on
+   our branch: `Conversion#command` runs `system()` without any time limit (Libre
+   too), Cliff parses mail in the Redmine process with `Mail.new` and no bound,
+   Zippy opens archives without entry or size limits, and `reload` / `unsafe`
+   let any viewer force a new conversion. redmine_contacts_helpdesk stores every
+   incoming customer mail as `message.eml` on the ticket, so a sender outside
+   GEOxyz controls a file that staff preview with Cliff.
+   Port, adapted to our code:
+   - a time limit for every converter command, stopping its whole process group
+     (INT/TERM, then KILL), also for Libre's soffice and its children;
+   - at most `max_conversions` at the same time, 503 beyond;
+   - size limits for repository files, archives (entries, total and per entry
+     uncompressed size, nesting), emails (size, parts, nesting, the mbox "From "
+     line), previews and the cache, 413 beyond;
+   - Cliff parses mail in a child process with a time and memory limit;
+   - Peek's images through the plugin's command and limits (upstream 0893c53);
+   - failed conversions remembered for a while, so a hostile file is not
+     converted again on every view; a stored preview is still served;
+   - `reload` and `unsafe` for administrators only;
+   - the limits as plugin settings with upstream's defaults, described in the
+     settings page and in the plan;
+   - the rake task that removes previews cached long ago.
+   Keep what our branch already does better or differently: the sandbox CSP
+   (q2), the core hand-over task (q3), the repository cache scope of 9088fd0,
+   prepend instead of alias_method, Redmine 7 only (no 6.x code paths).
+   New locale keys: translate them in every locale the plugin ships, by matching
+   existing keys in the same file (plugin rule); no new languages.
+
+2. Vince, upstream 285601d, 4c3aa7a, 0dffc8b, 8cdb292, 5bba6c1 (#19160, merged in 55a377f). PORT.
+   Our Vince renders ERB without escaping (`erb.result(binding).html_safe`), so
+   `<h2><%= vcf.fn.readable.join(", ") %></h2>` puts a vCard's FN into the page
+   as HTML; any URI scheme becomes a link (`javascript:` included), and GEO
+   builds a map URL from the raw value. The sandbox and the inline sanitizer
+   limit the impact today; port the escaping, the scheme allowlist (IM schemes
+   for IMPP only) and the validated GEO coordinates anyway.
+
+Not security, decide in the plan: Cliff's stderr fix (f030e1f); take it only if
+the Cliff port touches that code anyway. The CI changes of 6.1.2 do not apply.
+
+What to do: one commit per coherent part (process limits, concurrency, size
+limits per converter, failure memory, reload/unsafe, settings, cache task,
+Vince), each with tests that fail without it; port upstream's tests where they
+fit. Plugin tests green on PostgreSQL alone and with the other GEOxyz plugins.
+e2e, with screenshots opened and committed:
+- a zip bomb and an oversized or deeply nested email are refused (413);
+- a converter that hangs is stopped at the time limit and the next view does
+  not convert it again (failure remembered);
+- `reload` and `unsafe` are refused for manager, reporter and outsider and
+  work for admin;
+- the settings page shows the limits;
+- the cache rake task runs;
+- Vince: an FN with HTML is shown as text, a `javascript:` URI is not a link,
+  a GEO value with an injected path is not a link;
+- with redmine_contacts_helpdesk in the combined run: a hostile message.eml on
+  a helpdesk ticket gives a refusal, not a hung worker.
+Then your own adversarial review and `./.codex/openai_review.sh` when
+OPENAI_API_KEY is set, every finding with a Resolution line. Update Status,
+inventory and "After the upgrade": the limit values for production, the memory
+a server needs (upstream 854355f) and a schedule for the cache rake task. Push
+after every commit. End with a short report in Dutch. These decisions are final;
+do not stop to ask about them. If a part turns out impossible on our code base,
+write down why in the plan and carry on with the rest.
