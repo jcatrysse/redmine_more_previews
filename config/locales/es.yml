@@ -38,8 +38,12 @@ es:
   label_conversion_timeout:                              "Límite de tiempo (segundos)"
   label_lock_timeout:                                    "Límite de espera (segundos)"
   label_max_conversions:                                 "Conversiones simultáneas"
-  text_help_redmine_more_previews_limits:                "Una conversión que dure más que el límite de tiempo se detiene junto con todos los programas que inició (Libre recibe al menos 120 segundos). Una petición recibe 503 (inténtelo más tarde) cuando todas las conversiones, contadas en todos los procesos de Redmine, están ocupadas, o cuando espera más que el límite de espera una vista previa que se está generando."
+  label_max_repository_file:                             "Archivo de repositorio más grande (MiB)"
+  label_max_output:                                      "Vista previa más grande servida (MiB)"
+  label_max_cache:                                       "Tamaño de la caché (MiB)"
+  text_help_redmine_more_previews_limits:                "Una conversión que dure más que el límite de tiempo se detiene junto con todos los programas que inició (Libre recibe al menos 120 segundos). Una petición recibe 503 (inténtelo más tarde) cuando todas las conversiones, contadas en todos los procesos de Redmine, están ocupadas, o cuando espera más que el límite de espera una vista previa que se está generando. Un archivo de repositorio o una vista previa mayor que su límite se responde con 413. Cuando la caché supera su tamaño, las vistas previas nuevas se convierten en cada petición y no se guardan."
   text_more_previews_busy:                               "La vista previa se está generando o el servidor está ocupado. Inténtelo de nuevo más tarde."
+  text_more_previews_too_large:                          "El archivo es demasiado grande para una vista previa."
   
   label_redmine_more_previews_plugins_settings:            "Configuración de los plugins"
   

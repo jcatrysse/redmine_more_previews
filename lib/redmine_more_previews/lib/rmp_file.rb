@@ -132,6 +132,25 @@ module RedmineMorePreviews
           subdir unless !!(relative.to_path =~ /\A\.\./)
         end #def
         
+        # ------------------------------------------------------------------------------ #
+        # safe_relative_path( path(string) )
+        # returns a normalized relative path ("dir/file.txt") that cannot leave the
+        # directory it is joined to, or nil if the path is empty, absolute, contains
+        # a NUL byte or a ".." segment. Used for the entry names of archives.
+        #
+        def safe_relative_path( path )
+          _path = RmpText.to_utf8(path.to_s.dup)
+          return nil if _path.include?("\0")
+          return nil if _path.start_with?("/", "\\")     # absolute or UNC path
+          return nil if _path =~ /\A[A-Za-z]:/            # windows drive letter
+          segments = _path.split(%r{[\\/]+}).reject{|seg| seg.empty? || seg == "." }
+          return nil if segments.empty?
+          # NTFS strips trailing dots and spaces of a component, so ".. " or "..."
+          # would resolve to ".." on a Windows host: judge each segment without them
+          return nil if segments.any?{|seg| ["", ".", ".."].include?(seg.sub(/[. ]+\z/, "")) }
+          segments.join("/")
+        end #def
+        
         #-----------------------------------------------------------------------------------
         # safe_relative_path?(path)
         # true if path is relative and stays below the directory it is joined to:

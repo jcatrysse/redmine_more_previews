@@ -42,6 +42,37 @@ class Zippy < RedmineMorePreviews::Conversion
   
   ########################################################################################
   #
+  # limits
+  #
+  ########################################################################################
+  # An archive expands without bound: a tgz is inflated from the start up to the
+  # entry asked for, the entries skipped on the way included, and rubyzip reads the
+  # whole central directory when it opens a zip. The entries walked (count) and the
+  # bytes inflated (MiB) are bounded for tar and tgz, the entries and the central
+  # directory of a zip are checked before it is opened, an asset is extracted only
+  # up to max_asset (MiB) and the assets stored for one archive only up to
+  # max_stored (MiB). A converter setting overrides each default.
+  LIMITS    = {'max_entries' => 10_000, 'max_inflated' => 1024, 'max_asset' => 100, 'max_stored' => 1024}.freeze
+  
+  # the largest central directory a zip may declare, in bytes. rubyzip reads the
+  # directory by the number of entries, which is what bounds it (with the size of
+  # the archive); a zip declaring a larger directory than this is refused as well
+  MAX_CENTRAL_DIRECTORY = 32 * 1024 * 1024
+  
+  # directories below this depth are listed as one name
+  MAX_DEPTH = 64
+  
+  def limit( key )
+    value = converter_settings[key].to_i
+    value > 0 ? value : LIMITS[key]
+  end #def
+  
+  def limit_bytes( key )
+    limit( key ) * 1024 * 1024
+  end #def
+  
+  ########################################################################################
+  #
   # convert
   #
   ########################################################################################
@@ -92,7 +123,8 @@ class Zippy < RedmineMorePreviews::Conversion
   #---------------------------------------------------------------------------------------
   def tartoc( tarball )
     list = [[I18n.translate(:label_filepath)]]
-    tarlist( tarball, "", list)
+    complete = tarlist( tarball, "", list)
+    list << [CGI.escapeHTML(I18n.translate(:"redmine_more_previews.zippy.text_list_truncated"))] unless complete
     html = list.to_html(
         :table_class => "list",
         :headings    => true,
@@ -105,8 +137,9 @@ class Zippy < RedmineMorePreviews::Conversion
   #---------------------------------------------------------------------------------------
   # tarlist
   #---------------------------------------------------------------------------------------
+  # false if the list stops at a limit
    def tarlist( tarball, path="", arr=[], level=0 )
-    tarball.each do |entry|
+    each_tar_entry( tarball ) do |entry|
       if entry.file?
         arr << [("&nbsp;" * 2 * level + tarlink(entry))]
       elsif entry.directory?
@@ -116,11 +149,48 @@ class Zippy < RedmineMorePreviews::Conversion
   end #def
   
   #---------------------------------------------------------------------------------------
+  # each_tar_entry: the entries within the limits. Each entry takes a 512 byte
+  # header and its data rounded up to 512 bytes, all of which is inflated to get
+  # past it; the size is taken from the header before the data is read. Returns
+  # false if the walk stops at a limit, true if the archive ends before
+  #---------------------------------------------------------------------------------------
+  def each_tar_entry( tarball )
+    entries, bytes = 0, 0
+    tarball.each do |entry|
+      entries += 1
+      bytes   += 512 + (entry.header.size + 511) / 512 * 512
+      return false if entries > limit('max_entries') || bytes > limit_bytes('max_inflated')
+      yield entry
+    end
+    true
+  end #def
+  
+  # the cache directory of the whole archive: an asset is stored below it at its
+  # own path, so dir is the directory of a nested asset only (a/b.txt -> .../a)
+  def archive_dir
+    suffix = File.join( "", asset.to_s )
+    asset && targetpath.to_s.end_with?( suffix ) ? targetpath.delete_suffix( suffix ) : dir
+  end #def
+  
+  #---------------------------------------------------------------------------------------
   # tarlink
   #---------------------------------------------------------------------------------------
   def tarlink( entry, asset=nil )
-    path   = asset_link_path(entry.full_name)
-    link_to File.basename(RmpText.to_utf8(entry.full_name)), path, :download => File.basename(RmpText.to_utf8(entry.full_name))
+    entry_link( entry.full_name )
+  end #def
+  
+  #---------------------------------------------------------------------------------------
+  # entry_link
+  #
+  # entry names are attacker controlled. Only names that stay inside the archive root
+  # get a download link (the asset parameter is validated again server side); other
+  # entries are listed by name only.
+  #---------------------------------------------------------------------------------------
+  def entry_link( name )
+    basename = File.basename(RmpText.to_utf8(name))
+    safe     = RmpFile.safe_relative_path( name )
+    return CGI.escapeHTML(basename) unless safe
+    link_to basename, asset_link_path(safe), :download => basename
   end #def
   
   #---------------------------------------------------------------------------------------
@@ -139,15 +209,67 @@ class Zippy < RedmineMorePreviews::Conversion
   # tarcontent
   #---------------------------------------------------------------------------------------
   def tarcontent( tarball )
-    tarball.seek( asset ) do |entry|
-      FileUtils.rm_rf(tmpasset) if File.exist?(tmpasset)
-      FileUtils.mkdir_p(File.dirname(tmpasset)) 
-      File.open(tmpasset, "wb") do |f| 
-        while( chunk = entry.read(8192)) do
-          f.write chunk
-        end
+    # Only regular files are extracted: symlinks, devices etc. are never materialized
+    # in the tmp directory. The requested asset matches an entry by its raw name first
+    # and by its normalized name second, so "./dir/file" is still found for "dir/file"
+    # but an entry literally named "dir/file" wins. A tar can only be read forward, so
+    # the first normalized match is written right away and replaced if an exact match
+    # turns up later.
+    complete = each_tar_entry( tarball ) do |entry|
+      next unless entry.file?
+      if entry.full_name == asset
+        check_asset_size( entry.header.size )
+        write_asset{|f| while( chunk = entry.read(8192)) do f.write chunk end }
+        break
+      elsif !File.exist?(tmpasset) && RmpFile.safe_relative_path( entry.full_name ) == asset
+        check_asset_size( entry.header.size )
+        write_asset{|f| while( chunk = entry.read(8192)) do f.write chunk end }
       end
     end
+    # the walk stopped at a limit before the asset was found: it may lie beyond
+    if complete == false && !File.exist?( tmpasset )
+      raise ConverterTooLarge, "#{asset} lies beyond the limits of #{File.basename(source)}"
+    end
+  end #def
+  
+  #---------------------------------------------------------------------------------------
+  # check_asset_size: raises ConverterTooLarge for an asset larger than max_asset, or
+  # one that would take the assets stored for this archive beyond max_stored
+  #---------------------------------------------------------------------------------------
+  def check_asset_size( size )
+    if size > limit_bytes('max_asset')
+      raise ConverterTooLarge, "#{asset} is larger than #{limit('max_asset')} MiB"
+    end
+    if !(transient || unsafe) && stored_bytes + size > limit_bytes('max_stored')
+      raise ConverterTooLarge, "the assets stored for #{File.basename(source)} would exceed #{limit('max_stored')} MiB"
+    end
+  end #def
+  
+  # bytes of the files cached for this archive (the listing and the assets)
+  def stored_bytes
+    root = archive_dir
+    return 0 unless root && File.directory?( root )
+    Dir.glob( File.join( root, "**", "*" ), File::FNM_DOTMATCH ).sum do |path|
+      stat = File.lstat( path ) rescue nil
+      stat&.file? ? stat.size : 0
+    end
+  end #def
+  
+  #---------------------------------------------------------------------------------------
+  # asset_entry: the entry to serve for asset; exact name first, normalized name second
+  #---------------------------------------------------------------------------------------
+  def asset_entry( entries, &name )
+    entries.find{|e| name.call(e) == asset } ||
+    entries.find{|e| RmpFile.safe_relative_path( name.call(e) ) == asset }
+  end #def
+  
+  #---------------------------------------------------------------------------------------
+  # write_asset
+  #---------------------------------------------------------------------------------------
+  def write_asset( &block )
+    FileUtils.rm_rf(tmpasset) if File.exist?(tmpasset) || File.symlink?(tmpasset)
+    FileUtils.mkdir_p(File.dirname(tmpasset))
+    File.open(tmpasset, "wb", &block)
   end #def
   
   ########################################################################################
@@ -156,15 +278,79 @@ class Zippy < RedmineMorePreviews::Conversion
   #
   ########################################################################################
   def ziptable
+    check_central_directory
     Zip::File.open(source)  do |zip_file|
       ziptoc( zip_file )
     end
   end #def
   
   def zipasset
+    check_central_directory
     Zip::File.open(source)  do |zip_file|
       zipcontent( zip_file )
     end
+  end #def
+  
+  #---------------------------------------------------------------------------------------
+  # check_central_directory: reads the number of entries and the declared size of the
+  # central directory from the end of central directory record (the zip64 one if the
+  # record points to it), before rubyzip reads the directory entry by entry. A file without the record is left
+  # to rubyzip, which refuses it.
+  #---------------------------------------------------------------------------------------
+  EOCD_SIGNATURE       = [0x06054b50].pack("V").freeze
+  ZIP64_EOCD_SIGNATURE = [0x06064b50].pack("V").freeze
+  ZIP64_LOCATOR        = [0x07064b50].pack("V").freeze
+  
+  def check_central_directory
+    entries, size = central_directory
+    return unless entries
+    if entries > limit('max_entries')
+      raise ConverterTooLarge, "#{File.basename(source)} has more than #{limit('max_entries')} entries"
+    end
+    if size > MAX_CENTRAL_DIRECTORY
+      raise ConverterTooLarge, "the central directory of #{File.basename(source)} is larger than #{MAX_CENTRAL_DIRECTORY} bytes"
+    end
+  end #def
+  
+  # [entries, size] of the central directory as rubyzip (3.x, Redmine 7) reads them,
+  # nil where rubyzip fails as well. rubyzip reads the last END_OF_CDS_SIZE bytes and
+  # goes by the last end of central directory record in them; only if that record
+  # marks a field as zip64 (0xFFFF, 0xFFFFFFFF) does it take the zip64 record: the
+  # last one before the last locator before that end record, else the one the
+  # locator points to. Reading them any other way would check other numbers than
+  # rubyzip goes by.
+  END_OF_CDS_SIZE = 65_535 + 22 + 20
+  
+  def central_directory
+    File.open( source, "rb" ) do |file|
+      file.seek( [file.size - END_OF_CDS_SIZE, 0].max )
+      buf  = file.read.to_s.b
+      eocd = buf.rindex( EOCD_SIGNATURE )
+      return nil unless eocd
+      # disks (2 + 2), entries on disk (2), entries (2), size (4), offset (4)
+      disk, cd_disk, disk_entries, entries, size, offset = buf.byteslice( eocd + 4, 16 ).to_s.unpack( "vvvvVV" )
+      return nil unless offset
+      return [entries, size] unless [disk, cd_disk, disk_entries, entries].include?( 0xFFFF ) ||
+                                    [size, offset].include?( 0xFFFFFFFF )
+      locator = buf.rindex( ZIP64_LOCATOR, eocd )
+      return nil unless locator
+      zip64 = buf.rindex( ZIP64_EOCD_SIGNATURE, locator )
+      record = if zip64
+        buf.byteslice( zip64, locator - zip64 ).to_s
+      else
+        # disk (4), offset of the zip64 record (8): only the fixed part is read here
+        position = buf.byteslice( locator + 8, 8 ).to_s.unpack1( "Q<" )
+        return nil unless position && position < file.size
+        file.seek( position )
+        file.read( 56 ).to_s.b
+      end
+      # signature (4), size of record (8), versions (2 + 2), disks (4 + 4),
+      # entries on disk (8), entries (8), size (8)
+      return nil unless record.bytesize >= 48
+      record.byteslice( 32, 16 ).unpack( "Q<Q<" )
+    end
+  rescue SystemCallError, IOError
+    nil
   end #def
   
   #---------------------------------------------------------------------------------------
@@ -188,17 +374,49 @@ class Zippy < RedmineMorePreviews::Conversion
   #---------------------------------------------------------------------------------------
   # ziplist
   #---------------------------------------------------------------------------------------
+  # the tree is built from every entry's path, not by globbing directory
+  # entries: archives written with zip -D, Python's zipfile and others carry no
+  # directory entries at all, and their nested files were missing from the list
   def ziplist( zip_file, path="", arr=[], level=0 )
-    zip_file.glob(path + '*').each do |entry|
-      case entry.ftype
-      when :file 
-        arr << ["&nbsp;" * 2 * level + ziplink( entry ), 
-                number_to_human_size(entry.size), 
+    zipnode( ziptree( zip_file ), arr, level )
+  end #def
+  
+  # {name => {:dir => true, :children => {...}} | {:dir => false, :entry => entry}}
+  # in the order the entries appear in the archive
+  def ziptree( zip_file )
+    tree = {}
+    zip_file.entries.each do |entry|
+      next unless [:file, :directory].include?( entry.ftype )
+      segments = RmpText.to_utf8( entry.name ).split('/').reject(&:empty?)
+      next if segments.empty?
+      # a deeper path is listed as one name below MAX_DEPTH directories
+      segments = segments[0...MAX_DEPTH] + [segments[MAX_DEPTH..].join('/')] if segments.size > MAX_DEPTH + 1
+      node = tree
+      segments[0...-1].each do |segment|
+        child = node[segment]
+        child = node[segment] = {:dir => true, :children => {}} unless child && child[:dir]
+        node  = child[:children]
+      end
+      if entry.ftype == :directory
+        node[segments.last] ||= {:dir => true, :children => {}}
+      else
+        node[segments.last] = {:dir => false, :entry => entry}
+      end
+    end
+    tree
+  end #def
+  
+  def zipnode( node, arr, level )
+    node.each do |name, item|
+      if item[:dir]
+        arr << ["&nbsp;" * 2 * level + "<strong>" + CGI.escapeHTML(name) + "</strong>", "", ""]
+        zipnode( item[:children], arr, level + 1 )
+      else
+        entry = item[:entry]
+        arr << ["&nbsp;" * 2 * level + ziplink( entry ),
+                number_to_human_size(entry.size),
                 number_to_human_size(entry.compressed_size)
                ]
-      when :directory
-        arr << ["&nbsp;" * 2 * level + "<strong>" + CGI.escapeHTML(File.basename(RmpText.to_utf8(entry.name))) + "</strong>", "", ""]
-        ziplist( zip_file, RmpText.to_utf8(entry.name), arr, level + 1 )
       end
     end
   end #def
@@ -207,19 +425,33 @@ class Zippy < RedmineMorePreviews::Conversion
   # ziplink
   #---------------------------------------------------------------------------------------
   def ziplink( entry, asset=nil )
-    path   = asset_link_path(entry.name)
-    link_to File.basename(RmpText.to_utf8(entry.name)), path, :download => File.basename(RmpText.to_utf8(entry.name))
+    entry_link( entry.name )
   end #def
   
   #---------------------------------------------------------------------------------------
   # zipasset
   #---------------------------------------------------------------------------------------
   def zipcontent( zip_file )
-    if entry = zip_file.find_entry(asset)
-      FileUtils.rm_rf(tmpasset) if File.exist?(tmpasset)
-      FileUtils.mkdir_p(File.dirname(tmpasset)) 
-      File.open(tmpasset, "wb") {|f| f.write entry.get_input_stream.read }
-    end #def
+    # see tarcontent. The entry is streamed into tmpasset instead of Zip::File#extract,
+    # which would recreate symlink entries. Zip::File#extract also refused entries whose
+    # data exceeds the declared size (Zip::EntrySizeError); the stream does not, so the
+    # check is repeated here.
+    entry = asset_entry( zip_file.entries.select{|e| e.ftype == :file } ){|e| e.name }
+    return unless entry
+    check_asset_size( entry.size )
+    entry.get_input_stream do |io|
+      written = 0
+      write_asset do |f|
+        while( chunk = io.read(8192)) do
+          written += chunk.bytesize
+          raise Zip::EntrySizeError, "#{entry.name} exceeds its declared size #{entry.size}" if written > entry.size
+          f.write chunk
+        end
+      end
+    end
+  rescue Zip::EntrySizeError
+    FileUtils.rm_f(tmpasset)
+    raise
   end #def
   
 end #class

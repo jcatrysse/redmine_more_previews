@@ -43,6 +43,13 @@ module RedmineMorePreviews
       render :plain => l(:text_more_previews_busy), :status => 503, :content_type => 'text/plain'
     end
     private :render_more_preview_busy
+
+    # a file, an archive entry or a preview is larger than its limit (see
+    # Converter.max_repository_file, Converter.max_output, Zippy::LIMITS)
+    def render_more_preview_too_large(exception)
+      render :plain => l(:text_more_previews_too_large), :status => 413, :content_type => 'text/plain'
+    end
+    private :render_more_preview_too_large
     
     # Previews and assets are converted user files served from Redmine's origin.
     # Sandbox them, so that a script in a converted html, svg or mail cannot act
