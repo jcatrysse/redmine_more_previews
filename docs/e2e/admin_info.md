@@ -1,6 +1,6 @@
 # admin_info
 
-Run 2026-10-11T09:08:40.922Z against http://127.0.0.1:3000.
+Run 2026-10-12T06:25:36.315Z against http://127.0.0.1:3000.
 
 | screenshot | user | URL | shows |
 |---|---|---|---|

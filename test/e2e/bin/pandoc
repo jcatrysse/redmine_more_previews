@@ -1,0 +1,15 @@
+#!/bin/sh
+# End-to-end checks only (.codex/start_server.sh puts test/e2e/bin first in the server's PATH):
+# a pandoc that hangs for a markdown file containing E2E-HANG, so test/e2e/limits.mjs can show
+# the conversion time limit stopping it; any other file goes to the real pandoc.
+for a in "$@"; do
+  case "$a" in
+    *.md) if grep -q E2E-HANG "$a" 2>/dev/null; then
+            echo $$ > "${REDMINE_DIR:-.}/tmp/e2e-hang.pid"
+            exec sleep 600
+          fi ;;
+  esac
+done
+self_dir=$(cd "$(dirname "$0")" && pwd)
+PATH=$(printf '%s' "$PATH" | tr ':' '\n' | grep -vx "$self_dir" | paste -sd: -)
+exec pandoc "$@"

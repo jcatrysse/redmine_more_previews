@@ -20,9 +20,12 @@ end
 
 Setting.plugin_redmine_more_previews = {
   'embedding' => '0', 'cache_previews' => '1', 'debug' => '0', 'absolute' => '0',
+  # 10 s instead of 60 so limits.mjs does not wait long for the hanging stand-in (test/e2e/bin/pandoc)
+  'conversion_timeout' => '10',
   'converter' => {
     'libre' => { 'active' => '1', 'mime_types' => mime('docx' => 'pdf', 'odt' => 'html', 'xlsx' => 'html', 'csv' => 'png') },
-    'cliff' => { 'active' => '1', 'mime_types' => mime('eml' => 'html') },
+    # max_size 1 MiB instead of 50 so an oversized email fits below Redmine's attachment limit
+    'cliff' => { 'active' => '1', 'mime_types' => mime('eml' => 'html'), 'max_size' => '1' },
     'vince' => { 'active' => '1', 'mime_types' => mime('vcf' => 'html') },
     'mark' => { 'active' => '1', 'mime_types' => mime('md' => 'html', 'textile' => 'inline') },
     'pass' => { 'active' => '1', 'mime_types' => mime('html' => 'html') },
@@ -57,6 +60,57 @@ issue = e2e_preview_issue(project, 'E2E previews', admin)
 Dir[File.join(files, 'sample.*')].sort.each { |f| e2e_attach(issue, f, admin) }
 private_issue = e2e_preview_issue(private_project, 'E2E private previews', admin)
 e2e_attach(private_issue, File.join(files, 'sample.md'), admin)
+
+# files beyond the conversion limits (test/e2e/limits.mjs), generated here: an archive bomb,
+# an archive of too many entries, emails too large, too deeply nested or of too many parts,
+# a markdown file the pandoc stand-in hangs on, and a hostile vCard
+require 'zip'
+limits_dir = Rails.root.join('tmp', 'e2e-limits').to_s
+FileUtils.mkdir_p(limits_dir)
+limits = {
+  'bomb.zip' => lambda do |path|
+    Zip::OutputStream.open(path) do |zip|
+      zip.put_next_entry('readme.txt')
+      zip.write("200 MiB of zeros follow\n")
+      zip.put_next_entry('zeros.bin')
+      chunk = "\0" * (1024 * 1024)
+      200.times { zip.write(chunk) }
+    end
+  end,
+  'many.zip' => lambda do |path|
+    Zip::OutputStream.open(path) do |zip|
+      10_001.times { |n| zip.put_next_entry("f#{n}.txt"); zip.write('x') }
+    end
+  end,
+  'large.eml' => ->(path) { File.write(path, "From: a@example.net\r\nSubject: large\r\n\r\n" + ("x" * 76 + "\r\n") * 30_000) },
+  'nested.eml' => lambda do |path|
+    mail = +"From: a@example.net\r\nSubject: nested\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"b1\"\r\n\r\n"
+    (2..150).each { |n| mail << "--b#{n - 1}\r\nContent-Type: multipart/mixed; boundary=\"b#{n}\"\r\n\r\n" }
+    mail << "--b150\r\nContent-Type: text/plain\r\n\r\nleaf\r\n"
+    150.downto(1) { |n| mail << "--b#{n}--\r\n" }
+    File.write(path, mail)
+  end,
+  'parts.eml' => lambda do |path|
+    mail = +"From: a@example.net\r\nSubject: parts\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"p\"\r\n\r\n"
+    1_001.times { |n| mail << "--p\r\nContent-Type: text/plain\r\n\r\npart #{n}\r\n" }
+    File.write(path, mail << "--p--\r\n")
+  end,
+  'hang.md' => ->(path) { File.write(path, "# E2E-HANG\n\nThe pandoc stand-in of the e2e checks never returns for this file.\n") },
+  'hostile.vcf' => lambda do |path|
+    File.write(path, [
+      'BEGIN:VCARD', 'VERSION:4.0', 'FN:Mallory <b>bold</b><img src=x onerror=alert(1)>', 'N:Mallory;Eve;;;',
+      'URL:javascript:alert(document.domain)', 'IMPP:javascript:alert(1)', 'EMAIL:eve@example.net',
+      'GEO:geo:37.386013,-122.082932/../../../evil', 'TEL;VALUE=uri:tel:+1-555-0100',
+      'PHOTO;VALUE=uri:file:///etc/passwd', 'END:VCARD', ''
+    ].join("\r\n"))
+  end
+}
+limits_issue = e2e_preview_issue(project, 'E2E limits', admin)
+limits.each do |name, make|
+  path = File.join(limits_dir, name)
+  make.call(path) unless File.exist?(path)
+  e2e_attach(limits_issue, path, admin)
+end
 
 # git repository with the samples, for RepositoriesController#entry
 Setting.enabled_scm = (Setting.enabled_scm.to_a | ['Git'])
@@ -94,4 +148,5 @@ Member.create!(principal: viewer, project: project, roles: [changesets_role]) un
 File.write(Rails.root.join('tmp', 'e2e-manager-api-key'), User.find_by!(login: 'manager').api_key)
 
 puts "Plugin seed: #{issue.attachments.count} sample attachments on issue ##{issue.id}, " \
+     "#{limits_issue.attachments.count} beyond the limits on ##{limits_issue.id}, " \
      "private issue ##{private_issue.id}, repository #{repository.identifier} (#{repository.changesets.count} changeset)"

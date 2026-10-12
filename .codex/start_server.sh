@@ -115,6 +115,8 @@ if [ -f "$RMP_PIDFILE" ] && kill -0 "$(cat "$RMP_PIDFILE")" 2>/dev/null; then
 fi
 mkdir -p "$REDMINE_DIR/tmp/pids" "$REDMINE_DIR/log"
 if [ "${USE_MISE:-0}" = 1 ]; then prefix=("$MISE_BIN" exec "ruby@$RUBY_TARGET" --); else prefix=(); fi
+# a plugin may put stand-ins for external programs in test/e2e/bin (each says what it does)
+[ -d "$PLUGIN_ROOT/test/e2e/bin" ] && export PATH="$PLUGIN_ROOT/test/e2e/bin:$PATH"
 (cd "$REDMINE_DIR" && nohup "${prefix[@]}" bundle exec ruby bin/rails server -e "$RMP_SERVER_ENV" \
   -b 127.0.0.1 -p "$RMP_PORT" -P "$RMP_PIDFILE" > "$RMP_SERVER_LOG" 2>&1 &)
 

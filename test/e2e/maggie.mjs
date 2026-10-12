@@ -45,10 +45,12 @@ for (const user of ['manager', 'reporter']) {
     results.push(`${r.status()} ${name} -> index.${fmt}: ${head ? JSON.stringify(head) : '(empty)'}`);
     if (magic && !head.startsWith(magic)) t.problems.push(`${user} ${name}: not converted (${head})`);
     if (!magic && (head.startsWith('\x89PNG') || head.startsWith('%PDF'))) t.problems.push(`${user} disguised.pdf: a preview came back`);
+    // a conversion without output is answered with 404 since round 5 (curecodejp 32b9e77)
+    if (!magic && r.status() !== 404) t.problems.push(`${user} disguised.pdf: HTTP ${r.status()}, expected 404`);
   }
   if (fs.existsSync(marker)) t.problems.push(`${user}: the PostScript in disguised.pdf ran (${marker} exists)`);
   for (const name of ['disguised.pdf', 'sample.pdf', 'sample.png']) {
-    await t.go(`/attachments/${att[name]}`);
+    await t.go(`/attachments/${att[name]}`, { allow: name === 'disguised.pdf' ? { requests: [`404 image /attachments/more_preview/${att[name]}/index.png`] } : {} });
     await t.page.waitForTimeout(1000); await t.page.mouse.move(0, 0);
     await t.shot(`${user}-${name.replace('.', '-')}`, `${user}: ${name} ${name === 'disguised.pdf' ? 'gets no preview: PostScript disguised as a PDF never reaches ImageMagick' : 'still converted by Maggie'}`, { full: false });
   }
@@ -56,7 +58,7 @@ for (const user of ['manager', 'reporter']) {
   await t.shot(`${user}-results`, `${user}: the disguised PDF returns no image, the real PDF a PNG, the PNG a JPEG`, { full: false });
 }
 await t.login('outsider');
-await t.go(`/attachments/${att['disguised.pdf']}`); // public project: outsider may see attachments
+await t.go(`/attachments/${att['disguised.pdf']}`, { allow: { requests: [`404 image /attachments/more_preview/${att['disguised.pdf']}/index.png`] } }); // public project: outsider may see attachments
 await t.shot('outsider', 'outsider (non-member, public project): same result, no preview of the disguised PDF', { full: false });
 
 // clean up: remove the upload, restore the seed's settings

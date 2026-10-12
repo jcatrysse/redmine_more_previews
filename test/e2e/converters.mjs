@@ -21,7 +21,7 @@ const cases = [
   ['sample.odt', 'html', 'text/html', 'Office sample', 'Libre: odt converted to HTML by LibreOffice'],
   ['sample.xlsx', 'html', 'text/html', 'apple', 'Libre: xlsx converted to HTML (the sheet as a table)'],
   ['sample.csv', 'png', 'image/png', null, 'Libre: csv rendered as a PNG image'],
-  ['sample.eml', 'html', 'text/html', 'this is the body of the sample mail', 'Cliff: mail headers in a box above the body, "Unsafe reload" link'],
+  ['sample.eml', 'html', 'text/html', 'this is the body of the sample mail', 'Cliff: mail headers in a box above the body (no Update or unsafe link for the manager, see limits.mjs)'],
   ['sample.vcf', 'html', 'text/html', 'John Doe', 'Vince: business card from a vcf', fonts],
   ['sample.md', 'html', 'text/html', '<em>emphasis</em>', 'Mark: markdown converted to HTML by pandoc'],
   ['sample.textile', null, null, null, 'Mark: textile rendered inline in the page (was HTTP 500 before this branch)'],
@@ -65,12 +65,16 @@ if (!t.page.url().includes(`/attachments/${att['sample.odt']}`)) t.problems.push
 await t.page.waitForTimeout(1500);
 await t.shot('navigation-next', '"Next »" leads from sample.md to the next attachment of the issue (sample.odt)', { full: false });
 
-// Update (reload) regenerates the preview
+// Update (reload) regenerates the preview; administrators only (round 5, see limits.mjs)
+await t.login('admin');
+await t.go(`/attachments/${att['sample.odt']}`);
 await t.page.click('#content a.icon-reload');
 await t.settle();
 if (!t.page.url().includes('reload=1')) t.problems.push(`reload: ${t.page.url()}`);
 await t.page.waitForTimeout(1500);
-await t.shot('reload', 'The "Update" link (SVG reload icon) reconverts the file', { full: false });
+await t.shot('reload', 'As administrator, the "Update" link (SVG reload icon) reconverts the file', { full: false });
+
+await t.login('manager');
 
 // the file icons the plugin adds to attachment lists
 await t.go(`/issues/${issue.id}`);
