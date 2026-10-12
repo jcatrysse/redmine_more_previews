@@ -73,6 +73,28 @@ class CliffLimitsTest < ActiveSupport::TestCase
     end
   end
 
+  # the page of an email that is not previewed says why, not where in the code
+  def test_refused_email_shows_no_backtrace
+    with_cliff_settings('max_size' => '1') do
+      html = convert("Subject: big\n\n" + ('x' * (1024 * 1024 + 1)))
+      assert_equal 'the email is larger than 1 MiB', html
+    end
+  end
+
+  # the reason is a text of the plugin, in the language of the conversion
+  def test_refused_email_says_why_in_the_users_language
+    with_cliff_settings('max_size' => '1') do
+      html = I18n.with_locale(:de) { convert("Subject: big\n\n" + ('x' * (1024 * 1024 + 1))) }
+      assert_equal 'Die E-Mail ist größer als 1 MiB', html.dup.force_encoding(Encoding::UTF_8)
+    end
+  end
+
+  # any other error can name the paths of the server in its message
+  def test_failed_email_shows_no_message_of_the_error
+    Mail.stubs(:new).raises(Errno::ENAMETOOLONG, '/tmp/d20261012-1-abc/attachment')
+    assert_equal I18n.translate(:"redmine_more_previews.cliff.text_not_previewed"), convert("Subject: x\n\nbody")
+  end
+
   def test_email_with_too_many_parts_is_not_parsed
     source = mail_with_attachments(20)
     with_cliff_settings('max_parts' => '10') do

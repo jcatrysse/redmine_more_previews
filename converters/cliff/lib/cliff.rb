@@ -89,7 +89,7 @@ class Cliff < RedmineMorePreviews::Conversion
   
     # read eml file
     if File.size(source) > limit('max_size') * 1024 * 1024
-      raise ConverterBadArgument, "the email is larger than #{limit('max_size')} MiB"
+      refuse( :text_refused_size, :size => limit('max_size') )
     end
     text  = RmpText.to_utf8(File.read(source))
     check_parts( text )
@@ -138,8 +138,12 @@ class Cliff < RedmineMorePreviews::Conversion
   rescue StandardError => e
     # running out of memory or a signal is no error of the email: the child
     # fails (see Conversion#isolated), no error page is stored.
-    # The message can quote the mail being parsed, so it is attacker controlled
-    File.open(tmptarget, "wb") {|f| f.write (([e.message] + e.backtrace).map{|line| ERB::Util.html_escape(line)}.join("<br>\n")) }
+    # The message can quote the mail being parsed, so it is attacker controlled.
+    # The page tells why a limit refused the email; any other message can name
+    # the paths of the server (f.i. a system call's), which go to the log only
+    Rails.logger.error "Email #{File.basename(source)} not previewed: #{e.class}: #{e.message}\n#{Array(e.backtrace).join("\n")}"
+    reason = e.is_a?( ConverterBadArgument ) ? e.message : I18n.translate( :"redmine_more_previews.cliff.text_not_previewed" )
+    File.open(tmptarget, "wb") {|f| f.write ERB::Util.html_escape(reason) }
   end #def
   
   #---------------------------------------------------------------------------------------
@@ -288,6 +292,11 @@ class Cliff < RedmineMorePreviews::Conversion
     MAX_MEMORY
   end #def
   
+  # an email refused at a limit: the reason is shown as its preview
+  def refuse( key, values )
+    raise ConverterBadArgument, I18n.translate( :"redmine_more_previews.cliff.#{key}", **values )
+  end #def
+  
   def limit( key )
     @limits ||= {}
     @limits[key] ||= begin
@@ -315,12 +324,12 @@ class Cliff < RedmineMorePreviews::Conversion
   # Mail would parse, and stops at the first one beyond the limit
   def check_parts( text )
     if text.start_with?( "From" ) && text.byteslice( 0, MAX_LINE + 1 ).b[ENVELOPE].bytesize > MAX_LINE
-      raise ConverterBadArgument, "the email starts with a \"From\" line longer than #{MAX_LINE} characters"
+      refuse( :text_refused_envelope, :count => MAX_LINE )
     end
     count = 0
     text.scan( DELIMITER ) do
       count += 1
-      raise ConverterBadArgument, "the email has more than #{limit('max_parts')} parts" if count > limit('max_parts')
+      refuse( :text_refused_parts, :count => limit('max_parts') ) if count > limit('max_parts')
     end
   end #def
   
@@ -335,10 +344,10 @@ class Cliff < RedmineMorePreviews::Conversion
     until stack.empty?
       part, depth = stack.pop
       next unless part.multipart?
-      raise ConverterBadArgument, "the email has more than #{MAX_DEPTH} nested multipart parts" if depth > MAX_DEPTH
+      refuse( :text_refused_depth, :count => MAX_DEPTH ) if depth > MAX_DEPTH
       parsed += part.body.raw_source.to_s.bytesize
       if parsed > budget
-        raise ConverterBadArgument, "the nested multipart parts of the email add up to more than #{MAX_PARSED * limit('max_size')} MiB"
+        refuse( :text_refused_nested, :size => MAX_PARSED * limit('max_size') )
       end
       part.parts.each {|child| stack.push( [child, depth + 1] ) }
     end
