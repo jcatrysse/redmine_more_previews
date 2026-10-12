@@ -1,6 +1,6 @@
 # permissions
 
-Run 2026-10-11T09:45:35.242Z against http://127.0.0.1:3000.
+Run 2026-10-12T07:24:13.667Z against http://127.0.0.1:3000.
 
 | screenshot | user | URL | shows |
 |---|---|---|---|

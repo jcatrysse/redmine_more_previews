@@ -1,16 +1,16 @@
 # maggie
 
-Run 2026-10-11T09:42:57.221Z against http://127.0.0.1:3000.
+Run 2026-10-12T07:21:28.360Z against http://127.0.0.1:3000.
 
 | screenshot | user | URL | shows |
 |---|---|---|---|
 | ![](maggie-settings.png) | admin | `/settings/plugin/redmine_more_previews` | Maggie turned on for .pdf (to png) and .png (to jpg), Peek off for .pdf |
-| ![](maggie-manager-disguised-pdf.png) | manager | `/attachments/18` | manager: disguised.pdf gets no preview: PostScript disguised as a PDF never reaches ImageMagick |
+| ![](maggie-manager-disguised-pdf.png) | manager | `/attachments/27` | manager: disguised.pdf gets no preview: PostScript disguised as a PDF never reaches ImageMagick |
 | ![](maggie-manager-sample-pdf.png) | manager | `/attachments/8` | manager: sample.pdf still converted by Maggie |
 | ![](maggie-manager-sample-png.png) | manager | `/attachments/9` | manager: sample.png still converted by Maggie |
 | ![](maggie-manager-results.png) | manager | `/attachments/9` | manager: the disguised PDF returns no image, the real PDF a PNG, the PNG a JPEG |
-| ![](maggie-reporter-disguised-pdf.png) | reporter | `/attachments/18` | reporter: disguised.pdf gets no preview: PostScript disguised as a PDF never reaches ImageMagick |
+| ![](maggie-reporter-disguised-pdf.png) | reporter | `/attachments/27` | reporter: disguised.pdf gets no preview: PostScript disguised as a PDF never reaches ImageMagick |
 | ![](maggie-reporter-sample-pdf.png) | reporter | `/attachments/8` | reporter: sample.pdf still converted by Maggie |
 | ![](maggie-reporter-sample-png.png) | reporter | `/attachments/9` | reporter: sample.png still converted by Maggie |
 | ![](maggie-reporter-results.png) | reporter | `/attachments/9` | reporter: the disguised PDF returns no image, the real PDF a PNG, the PNG a JPEG |
-| ![](maggie-outsider.png) | outsider | `/attachments/18` | outsider (non-member, public project): same result, no preview of the disguised PDF |
+| ![](maggie-outsider.png) | outsider | `/attachments/27` | outsider (non-member, public project): same result, no preview of the disguised PDF |

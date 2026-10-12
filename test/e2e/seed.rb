@@ -112,6 +112,27 @@ limits.each do |name, make|
   e2e_attach(limits_issue, path, admin)
 end
 
+# with redmine_contacts_helpdesk (combined run): hostile customer emails arrive as tickets
+# through HelpdeskMailer.receive, which stores each as message.eml on the ticket
+# (test/e2e/helpdesk_mail.mjs); a Message-ID seen before is ignored the second time
+if defined?(HelpdeskMailer)
+  project.enabled_module_names = (project.enabled_module_names | %w(contacts contacts_helpdesk))
+  ContactsSetting['helpdesk_answer_from', project.id] ||= 'support@e2e.example'
+  nested = +"Content-Type: multipart/mixed; boundary=\"h1\"\r\n\r\n"
+  (2..150).each { |n| nested << "--h#{n - 1}\r\nContent-Type: multipart/mixed; boundary=\"h#{n}\"\r\n\r\n" }
+  nested << "--h150\r\nContent-Type: text/plain\r\n\r\nleaf\r\n"
+  150.downto(1) { |n| nested << "--h#{n}--\r\n" }
+  parts = +"Content-Type: multipart/mixed; boundary=\"p\"\r\n\r\n"
+  1_001.times { |n| parts << "--p\r\nContent-Type: text/plain\r\n\r\npart #{n}\r\n" }
+  parts << "--p--\r\n"
+  { 'E2E hostile mail nested' => nested, 'E2E hostile mail parts' => parts }.each_with_index do |(subject, body), i|
+    raw = ["Message-ID: <e2e-hostile-#{i}@customer.example>", "Date: #{Time.now.rfc2822}",
+           'From: Mallory <mallory@customer.example>', 'To: support@e2e.example',
+           "Subject: #{subject}", 'MIME-Version: 1.0'].join("\r\n") + "\r\n" + body
+    HelpdeskMailer.receive(raw, issue: { project_id: project.identifier })
+  end
+end
+
 # git repository with the samples, for RepositoriesController#entry
 Setting.enabled_scm = (Setting.enabled_scm.to_a | ['Git'])
 repo_dir = Rails.root.join('tmp', 'e2e-repo').to_s

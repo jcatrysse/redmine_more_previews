@@ -18,14 +18,18 @@ await t.page.locator('#preview_repository_entry_top a.collapsible', { hasText: '
 await t.page.waitForTimeout(500);
 if (!(await t.page.locator('#preview_repository_entry_top', { hasText: 'Message-ID' }).count())) t.problems.push('header fields not shown');
 await t.page.mouse.move(0, 0);
-await t.shot('headers', 'Mail preview: header box, all header fields opened with "...", the body below; Update and Unsafe reload with their icons', { full: false });
+await t.shot('headers', 'Mail preview as manager: header box, all header fields opened with "...", the body below; no Update or Unsafe reload (administrators only since round 5)', { full: false });
+if (await t.page.locator('#content a.icon-warning, #content a.icon-reload').count()) t.problems.push('manager sees Update or Unsafe reload');
 
+await t.login('admin');
+await t.go(`/attachments/${att['sample.eml']}`);
 await t.page.click('#content a.icon-warning');
 await t.settle();
 if (!/reload=1/.test(t.page.url()) || !/unsafe=1/.test(t.page.url())) t.problems.push(`unsafe reload: ${t.page.url()}`);
 t.check('unsafe reload');
 await t.page.mouse.move(0, 0);
-await t.shot('unsafe-reload', '"Unsafe reload" converts the mail again without the cache', { full: false });
+await t.shot('unsafe-reload', 'As administrator, "Unsafe reload" converts the mail again without the cache', { full: false });
+await t.login('manager');
 
 // a hostile mail, uploaded through the REST API as the manager
 
