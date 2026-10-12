@@ -21,12 +21,21 @@
 
 class Peek < RedmineMorePreviews::Conversion
   
+  # as Redmine's thumbnails of a PDF, with a fixed output name (see Maggie::OUTPUT)
+  SIZE   = 800
+  OUTPUT = "out"
+  
   def convert
     case preview_format
     when 'pdf'
       FileUtils.cp( source, tmptarget )
     when 'jpg', 'png', 'gif'
-      Redmine::Thumbnail.generate(source, tmptarget, 800, true)
+      # not Redmine::Thumbnail.generate: its timeout kills the shell only, leaving
+      # convert and Ghostscript running, and ImageMagick's pixel cache is unbounded
+      return unless Redmine::Thumbnail.valid_pdf_magic?(source) && Redmine::Thumbnail.gs_available?
+      output = thisdir("#{OUTPUT}.#{preview_format}")
+      cmd    = "#{RedmineMorePreviews.convert_command} #{shell_quote "pdf:#{source}[0]"} -thumbnail #{shell_quote "#{SIZE}x#{SIZE}>"} #{shell_quote "#{preview_format}:#{output}"}"
+      command( cd + join + cmd + join + move(output) )
     end
   end #def
   
