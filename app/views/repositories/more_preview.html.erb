@@ -53,7 +53,7 @@
                 :path          => @path,
                 :format        => RedmineMorePreviews::Converter.conversion_ext( @entry.name, :pathonly => true), 
                 :only_path     => ::Setting['plugin_redmine_more_previews']['absolute'].to_i == 0
-                }.merge(request.query_parameters)
+                }.merge(preview_query_parameters)
           ),
          :alt => RedmineMorePreviews::Converter.conversion_mime(@entry.name, :pathonly => true),
          :style => "max-width:95%"
@@ -67,7 +67,7 @@
       });
     </script>
     <div id="preview_repository_entry_top">
-      <%= call_hook(:preview_repository_entry_top, :repository => @repository, :path => @path, :rev => @rev, :entry => @entry, :project => @project, :params => request.query_parameters.merge(:request => request).symbolize_keys ) %>
+      <%= call_hook(:preview_repository_entry_top, :repository => @repository, :path => @path, :rev => @rev, :entry => @entry, :project => @project, :params => preview_query_parameters.merge(:request => request).symbolize_keys ) %>
     </div>
     <div>
     <%= more_previews_tag(
@@ -80,7 +80,7 @@
                  :path          => @path,
                  :format        => RedmineMorePreviews::Converter.conversion_ext( @entry.name, :pathonly => true), 
                  :only_path     => ::Setting['plugin_redmine_more_previews']['absolute'].to_i == 0
-                 }.merge(request.query_parameters)
+                 }.merge(preview_query_parameters)
            ),
            @entry.name,
           :type => RedmineMorePreviews::Converter.conversion_mime(@entry.name, :pathonly => true)

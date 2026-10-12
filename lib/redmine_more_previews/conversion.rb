@@ -123,6 +123,12 @@ module RedmineMorePreviews
       
       # create path_sets for cache storage
       self.targetpath, self.dir,        self.file,       self.ext      = path_set( target,                :nocreate => true )
+      # an asset is stored below the directory of its preview at its own path
+      # (a/b.txt -> <preview>/a/b.txt): that directory is the asset's as well, for
+      # its lock, its marker and what is copied into it. The directory of the
+      # target held the asset at a/a/b.txt, where it was never found again
+      suffix = File.join( "", asset.to_s )
+      self.dir = targetpath.delete_suffix( suffix ) if asset && targetpath.to_s.end_with?( suffix )
       self.assetpath,  self.assetdir,   self.assetfile,  self.assetext = path_set( File.join(dir, asset), :nocreate => true ) if asset
       self.assetspaths = assets.to_a.map{ |ass| path_set( File.join(dir, ass), nil, :nocreate => true )}
     end #def
@@ -221,11 +227,32 @@ module RedmineMorePreviews
       # sourcefile, either direct or copied in a tmp dir from elsewhere 
       begin; self.source = file.path; rescue; raise ConverterBadArgument; end
       
+      # an asset the stored preview does not offer is not converted for: its
+      # name comes from the request, and every new name would convert again
+      # (an asset stored already is served, whatever the list says)
+      listed = asset && (File.file?( assetpath ) ? true : asset_listed)
+      unless reload
+        if listed == false
+          Rails.logger.info "Asset #{asset} of #{file.path} not found in its preview"
+          return nil
+        elsif listed == :beyond
+          raise ConverterTooLarge, "#{asset} lies beyond the limits of #{File.basename(file.path)}"
+        end
+      end
+
       # a failure is remembered for a while (see Lib::RmpFailures): the same
-      # request fails at once instead of converting again, until a reload
+      # request fails at once instead of converting again, until a reload. An
+      # asset's failure only if the asset is known to exist: a failure kept for
+      # any name asked for would take a file for each
+      failure = targetpath if !asset || listed == true
+      # an asset of a converter that writes its assets with its preview is
+      # converted with the preview: the preview's failure is the asset's as well
+      whole = File.join( dir, ["index", preview_format].join(".") ) if asset && listed.nil? && !assets_on_demand?
+      # one kept is looked for whatever the name: looking writes no file
       if reload
         Lib::RmpFailures.forget( targetpath )
-      elsif (reason = Lib::RmpFailures.recorded( targetpath ))
+        Lib::RmpFailures.forget( whole )
+      elsif !stored? && (reason = Lib::RmpFailures.recorded( targetpath ) || Lib::RmpFailures.recorded( whole ))
         Rails.logger.info "Preview for #{file.path} failed before (#{reason}), not converted again"
         raise ConverterTooLarge, "#{File.basename(file.path)} failed before" if reason == "too_large"
         return nil
@@ -239,13 +266,16 @@ module RedmineMorePreviews
           # transient (non-cached) conversion, yielded in block. What the block is
           # given is checked first: it may return from the caller
           with_slot { sync { transient_preview do |*files|
-            Lib::RmpFailures.record( targetpath, "empty" ) if (asset ? files[1] : files[0]).nil?
+            # an asset missing from a preview that was converted is no failure of the
+            # preview's; none at all is
+            @preview_converted = !files[0].nil?
+            Lib::RmpFailures.record( failure || whole_failed( whole ), "empty" ) if (asset ? files[1] : files[0]).nil?
             block.call( *files )
           end } }
         else
           # cached conversion, just read from file
           data = cached_preview
-          data.nil? ? Lib::RmpFailures.record( targetpath, "empty" ) : Lib::RmpFailures.forget( targetpath )
+          data.nil? ? Lib::RmpFailures.record( failure || whole_failed( whole ), "empty" ) : Lib::RmpFailures.forget( failure )
           data
         end
       rescue ConverterLockTimeOut => e
@@ -255,13 +285,17 @@ module RedmineMorePreviews
       rescue ConverterTooLarge => e
         # answered with 413 by the controller
         Rails.logger.warn "Preview for #{file.path} not generated: #{e.message}"
-        Lib::RmpFailures.record( targetpath, "too_large" )
+        # the conversion may have listed the asset meanwhile (see store_asset_list);
+        # an asset too large exists, and is the asset's failure, not the preview's
+        failure ||= targetpath if asset && (@asset_too_large || asset_listed == true)
+        Lib::RmpFailures.record( failure || whole_failed( whole ), "too_large" )
         raise
       rescue Exception => e
         Rails.logger.error "An error occured while generating preview for #{file.path}"
         Rails.logger.error "Exception was: #{e.message}"
         Rails.logger.error e.backtrace.join("\n")
-        Lib::RmpFailures.record( targetpath, "error" )
+        failure ||= targetpath if asset && asset_listed == true
+        Lib::RmpFailures.record( failure || whole_failed( whole ), "error" )
         return nil
       end
     end #def
@@ -314,10 +348,22 @@ module RedmineMorePreviews
             Rails.logger.warn "Preview cache is full, #{dir} is not stored"
             # nothing is stored: a converter's limits on what it stores do not apply
             self.transient = true
-            return with_slot { sync { transient_preview{|target_data, asset_data, *| asset ? asset_data : target_data } } }
+            return with_slot { sync { transient_preview{|target_data, asset_data, *|
+              @preview_converted = !target_data.nil?
+              asset ? asset_data : target_data
+            } } }
           end
-          # a preview that could not be served is not stored either
-          with_slot { sync { transient_preview( read: false ) { check_output_size; copy_over } } }
+          # a preview that could not be served is not stored either; the names a
+          # converter listed before it stopped at a limit or failed are, so that
+          # another name is not looked for again
+          begin
+            with_slot { sync { transient_preview( read: false ) { check_output_size; copy_over } } }
+          rescue ConverterLockTimeOut
+            raise
+          rescue StandardError
+            store_asset_list
+            raise
+          end
         end
         read_safe
       end
@@ -347,6 +393,7 @@ module RedmineMorePreviews
       raise ConverterBadArgument unless Lib::RmpFile.within_directory?( RedmineMorePreviews::Constants::Defaults::MORE_PREVIEWS_STORAGE_PATH, dir )
       FileUtils.rm_rf( dir )
       FileUtils.rm_f( marker_path )
+      Lib::RmpAssetList.remove( dir )
     end #def
     private :discard_cache
     
@@ -371,6 +418,55 @@ module RedmineMorePreviews
       File.write( marker_path, id.to_s ) if marker_path
     end #def
     private :write_marker
+
+    #-------------------------------------------------------------------------------------
+    # assets offered by the stored preview
+    #-------------------------------------------------------------------------------------
+    # true for a converter that extracts an asset only when it is asked for, and
+    # lists the names it offers (see list_assets); false for one that writes all
+    # its assets with the preview
+    def assets_on_demand?
+      false
+    end #def
+
+    # a converter that extracts its assets on demand gives the names they may be
+    # asked for while it makes the preview; complete is false if it stopped at a
+    # limit. They are stored with the preview (see Lib::RmpAssetList)
+    def list_assets( names, complete )
+      @listed_assets = [names, complete]
+    end #def
+
+    # whether the asset asked for exists, known from the stored preview of this
+    # converter without converting: true, false (it does not), :beyond (a list
+    # that stopped at a limit has not its name) or nil (not known)
+    def asset_listed
+      return nil unless cached_by_this_converter?
+      if assets_on_demand?
+        Lib::RmpAssetList.lookup( dir, asset )
+      elsif File.file?( File.join( dir, ["index", preview_format].join(".") ) )
+        File.file?( assetpath )
+      end
+    rescue SystemCallError
+      nil
+    end #def
+    private :asset_listed
+    
+    # the preview or asset asked for is stored: it is served whatever failure was
+    # remembered, which a request that failed may write after another stored it
+    def stored?
+      !( unsafe || transient ) && valid && cached_by_this_converter? && File.file?( asset ? assetpath : targetpath )
+    rescue SystemCallError
+      false
+    end #def
+    private :stored?
+    
+    # the key of the preview's failure for an asset that failed with it (see
+    # preview), nil once the preview is converted or stored: then the failure is
+    # the asset's
+    def whole_failed( whole )
+      whole unless whole.nil? || @preview_converted || File.file?( whole )
+    end #def
+    private :whole_failed
     
     #-------------------------------------------------------------------------------------
     # copy over
@@ -387,8 +483,19 @@ module RedmineMorePreviews
           FileUtils.copy_entry(File.join(tmpdir,f), File.join(dir,f), true, false, true)
         end
         write_marker
+        store_asset_list
       end
     end #def
+    
+    # the names of the assets a converter listed (see list_assets), with the
+    # marker they are taken by
+    def store_asset_list
+      return unless @listed_assets && dir
+      FileUtils.mkdir_p( dir )
+      write_marker
+      Lib::RmpAssetList.write( dir, *@listed_assets )
+    end #def
+    private :store_asset_list
     
     #-------------------------------------------------------------------------------------
     # read safe
@@ -404,6 +511,7 @@ module RedmineMorePreviews
     def check_output_size
       [tmptarget, tmpasset].compact.each do |path|
         next unless File.file?( path ) && File.size( path ) > RedmineMorePreviews::Converter.max_output
+        @asset_too_large = asset && path == tmpasset
         raise ConverterTooLarge, "#{File.basename(path)} is larger than #{RedmineMorePreviews::Converter.max_output} bytes"
       end
     end #def
@@ -413,6 +521,7 @@ module RedmineMorePreviews
     # read (ConverterTooLarge)
     def read_limited( path )
       if File.size( path ) > RedmineMorePreviews::Converter.max_output
+        @asset_too_large = asset && [tmpasset, assetpath].include?( path )
         raise ConverterTooLarge, "#{File.basename(path)} is larger than #{RedmineMorePreviews::Converter.max_output} bytes"
       end
       File.open( path, "rb" ) {|io| io.read}

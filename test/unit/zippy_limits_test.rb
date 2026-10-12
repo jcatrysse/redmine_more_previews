@@ -197,7 +197,234 @@ class ZippyLimitsTest < ActiveSupport::TestCase
     assert_equal Zippy::MAX_DEPTH, depth
   end
 
+  # the stored listing names the entries: another name is not looked for in the
+  # archive again, and no failure is kept for it (one for each name asked for)
+  def test_name_missing_from_the_stored_listing_is_not_looked_for
+    tgz = build_tgz(path('a.tgz'), 'a.txt' => 'a', 'dir/b.txt' => 'b')
+    store_listing(tgz)
+    Zippy.any_instance.expects(:convert).never
+    %w(missing.txt dir/missing.txt).each do |name|
+      assert_nil stored_asset(tgz, name)
+      assert_nil RedmineMorePreviews::Lib::RmpFailures.recorded(asset_target(tgz, name))
+    end
+  end
+
+  def test_names_in_the_stored_listing_are_extracted
+    tgz = build_tgz(path('a.tgz'), './a.txt' => 'a', 'dir/b.txt' => 'b')
+    zip = build_zip(path('a.zip'), 'dir/' => '', 'dir/c.txt' => 'c')
+    store_listing(tgz)
+    store_listing(zip)
+    assert_equal 'a', stored_asset(tgz, 'a.txt'), 'by its normalized name'
+    assert_equal 'b', stored_asset(tgz, 'dir/b.txt')
+    assert_equal 'c', stored_asset(zip, 'dir/c.txt')
+    assert_nil stored_asset(zip, 'dir'), 'a directory is no asset'
+  end
+
+  # a listing that stopped at a limit: a name it has not may lie beyond, and is
+  # refused as the walk would refuse it, without the walk
+  def test_name_beyond_a_truncated_listing_is_refused_without_a_walk
+    tgz = build_tgz(path('a.tgz'), (1..5).to_h { |n| ["f#{n}.txt", "file #{n}"] })
+    with_zippy_limits('max_entries' => '3') do
+      store_listing(tgz)
+      assert_equal 'file 2', stored_asset(tgz, 'f2.txt')
+      Zippy.any_instance.expects(:convert).never
+      assert_raises(ConverterTooLarge) { stored_asset(tgz, 'f5.txt') }
+      assert_nil RedmineMorePreviews::Lib::RmpFailures.recorded(asset_target(tgz, 'f5.txt'))
+    end
+  end
+
+  # an asset stored already (f.i. by an administrator's reload after the limits
+  # were raised) is served, though the listing stopped before it
+  def test_stored_asset_beyond_a_truncated_listing_is_served
+    tgz = build_tgz(path('a.tgz'), (1..5).to_h { |n| ["f#{n}.txt", "file #{n}"] })
+    with_zippy_limits('max_entries' => '3') do
+      store_listing(tgz)
+      File.write(asset_target(tgz, 'f5.txt'), 'file 5')
+      Zippy.any_instance.expects(:convert).never
+      assert_equal 'file 5', stored_asset(tgz, 'f5.txt')
+    end
+  end
+
+  # without a stored listing the archive is walked once, to its end, and the
+  # names are stored then: another name is not looked for again, and a missing
+  # name is not remembered as failed
+  def test_names_are_listed_by_the_first_asset_without_a_stored_listing
+    tgz = build_tgz(path('a.tgz'), 'a.txt' => 'a', 'b.txt' => 'b')
+    assert_equal 'a', stored_asset(tgz, 'a.txt')
+    assert_nil stored_asset(tgz, 'missing.txt')
+    assert_nil RedmineMorePreviews::Lib::RmpFailures.recorded(asset_target(tgz, 'missing.txt'))
+    Zippy.any_instance.expects(:convert).never
+    assert_nil stored_asset(tgz, 'other.txt')
+    assert_equal 'a', stored_asset(tgz, 'a.txt')
+  end
+
+  def test_names_are_listed_by_a_missing_asset_without_a_stored_listing
+    zip = build_zip(path('a.zip'), 'a.txt' => 'a')
+    assert_nil stored_asset(zip, 'missing.txt')
+    Zippy.any_instance.expects(:convert).never
+    assert_nil stored_asset(zip, 'other.txt')
+  end
+
+  # the walk of a first asset stopped at a limit: the names before it are
+  # stored all the same, and another name is refused without a walk
+  def test_names_are_listed_by_an_asset_beyond_the_limits
+    tgz = build_tgz(path('a.tgz'), (1..5).to_h { |n| ["f#{n}.txt", "file #{n}"] })
+    with_zippy_limits('max_entries' => '3') do
+      assert_raises(ConverterTooLarge) { stored_asset(tgz, 'f5.txt') }
+      Zippy.any_instance.expects(:convert).never
+      assert_raises(ConverterTooLarge) { stored_asset(tgz, 'f6.txt') }
+      assert_nil RedmineMorePreviews::Lib::RmpFailures.recorded(asset_target(tgz, 'f6.txt'))
+    end
+  end
+
+  # an asset too large is refused after the walk: the names are listed, and its
+  # failure remembered, so that neither it nor another name walks the archive again
+  def test_asset_too_large_without_a_stored_listing_is_not_walked_again
+    tgz = build_tgz(path('a.tgz'), 'big.bin' => "\0" * (2 * 1024 * 1024), 'a.txt' => 'a')
+    with_zippy_limits('max_asset' => '1') do
+      assert_raises(ConverterTooLarge) { stored_asset(tgz, 'big.bin') }
+      assert_equal 'too_large', RedmineMorePreviews::Lib::RmpFailures.recorded(asset_target(tgz, 'big.bin'))
+      Zippy.any_instance.expects(:convert).never
+      assert_raises(ConverterTooLarge) { stored_asset(tgz, 'big.bin') }
+      assert_nil stored_asset(tgz, 'missing.txt')
+    end
+  end
+
+  # an archive broken after the asset still serves it, as when the walk stopped
+  # at the asset
+  def test_asset_before_a_broken_entry_is_served
+    tar = build_tar(path('broken.tar'), 'a.txt' => 'a', 'b.txt' => 'b')
+    data = File.binread(tar)
+    data[1024, 512] = 'x' * 512 # the header of b.txt
+    File.binwrite(tar, data)
+    assert_equal 'a', stored_asset(tar, 'a.txt')
+  end
+
+  # a broken archive ends the walk as a limit does: an asset too large before the
+  # break is refused, the names before it are listed and the failure remembered,
+  # and a name not found may lie beyond the break: neither walks the archive again
+  def test_broken_archive_is_not_walked_again
+    tar = build_tar(path('broken.tar'), 'big.bin' => 'x' * (2 * 1024 * 1024), 'a.txt' => 'a', 'b.txt' => 'b')
+    data = File.binread(tar)
+    offset = 512 + 2 * 1024 * 1024 + 512 + 512 # big.bin, a.txt: the header of b.txt
+    data[offset, 512] = 'x' * 512
+    File.binwrite(tar, data)
+    with_zippy_limits('max_asset' => '1') do
+      assert_raises(ConverterTooLarge) { stored_asset(tar, 'big.bin') }
+      Zippy.any_instance.expects(:convert).never
+      assert_raises(ConverterTooLarge) { stored_asset(tar, 'big.bin') }
+      assert_raises(ConverterTooLarge) { stored_asset(tar, 'missing.txt') }
+    end
+  end
+
+  # an entry of a zip that fails to extract: the names listed from the central
+  # directory are stored, and the failure remembered, so that the entry is not
+  # extracted again
+  def test_zip_entry_that_fails_is_not_extracted_again
+    zip = build_zip(path('a.zip'), 'a.txt' => 'a')
+    Zip::Entry.any_instance.stubs(:get_input_stream).raises(Zip::Error, 'broken')
+    assert_nil stored_asset(zip, 'a.txt')
+    assert_equal 'error', RedmineMorePreviews::Lib::RmpFailures.recorded(asset_target(zip, 'a.txt'))
+    Zippy.any_instance.expects(:convert).never
+    assert_nil stored_asset(zip, 'a.txt')
+    assert_nil stored_asset(zip, 'missing.txt')
+  end
+
+  # a listing that fails at a broken entry offers the entries before it still
+  def test_entries_before_a_break_in_a_failed_listing_are_offered
+    tar = build_tar(path('broken.tar'), 'a.txt' => 'a', 'b.txt' => 'b')
+    data = File.binread(tar)
+    data[1024, 512] = 'x' * 512 # the header of b.txt
+    File.binwrite(tar, data)
+    assert_nil zippy_worker(target: target_of(tar), request: fake_request).preview(File.new(tar))
+    assert_equal 'a', stored_asset(tar, 'a.txt')
+    Zippy.any_instance.expects(:convert).never
+    assert_raises(ConverterTooLarge) { stored_asset(tar, 'b.txt') }
+  end
+
+  # a zip that cannot be opened offers no asset: no name opens it again
+  def test_zip_that_cannot_be_opened_is_not_opened_again
+    zip = build_zip(path('a.zip'), 'a.txt' => 'a')
+    Zip::File.stubs(:open).raises(Zip::Error, 'broken')
+    assert_nil stored_asset(zip, 'a.txt')
+    Zippy.any_instance.expects(:convert).never
+    assert_nil stored_asset(zip, 'a.txt')
+    assert_nil stored_asset(zip, 'other.txt')
+  end
+
+  # rubyzip fails on some broken zips with errors not its own (a zip64 record
+  # before its locator: TypeError): no name opens such a zip again either
+  def test_zip_failing_with_another_error_is_not_opened_again
+    zip = build_zip(path('a.zip'), 'a.txt' => 'a')
+    Zip::File.stubs(:open).raises(TypeError, 'broken')
+    assert_nil stored_asset(zip, 'a.txt')
+    Zippy.any_instance.expects(:convert).never
+    assert_nil stored_asset(zip, 'other.txt')
+  end
+
+  # an error of the system is not taken for a broken archive: the stored list
+  # stays, and the other entries are extracted once it passes
+  def test_error_of_the_system_keeps_the_stored_list
+    tar = build_tar(path('a.tar'), 'a.txt' => 'a', 'b.txt' => 'b')
+    store_listing(tar)
+    Zippy.any_instance.stubs(:tarasset).raises(Errno::EIO)
+    assert_nil stored_asset(tar, 'a.txt')
+    Zippy.any_instance.unstub(:tarasset)
+    assert_equal 'b', stored_asset(tar, 'b.txt')
+  end
+
+  # a failure written after another request stored the preview does not hide
+  # it: A fails, B converts and stores the preview meanwhile, then A writes
+  # its failure
+  def test_failure_written_after_a_stored_preview_does_not_hide_it
+    tar = build_tar(path('a.tar'), 'a.txt' => 'a')
+    Zippy.any_instance.stubs(:convert).raises(RuntimeError, 'busy disk')
+    failures = RedmineMorePreviews::Lib::RmpFailures
+    record = failures.method(:record)
+    other = false
+    convert_b = -> { zippy_worker(target: target_of(tar), request: fake_request).preview(File.new(tar)) }
+    failures.define_singleton_method(:record) do |key, reason|
+      unless other
+        other = true
+        Zippy.any_instance.unstub(:convert)
+        raise 'B failed' unless convert_b.call
+      end
+      record.call(key, reason)
+    end
+    assert_nil zippy_worker(target: target_of(tar), request: fake_request).preview(File.new(tar))
+    assert other
+    assert zippy_worker(target: target_of(tar), request: fake_request).preview(File.new(tar)), 'the stored preview is served'
+  ensure
+    failures.define_singleton_method(:record, record) if record
+  end
+
+  # the first exact match wins over a later entry of the same name, as before
+  # the walk went on past it
+  def test_first_entry_of_a_name_is_extracted
+    tar = build_tar(path('dup.tar'), 'a.txt' => 'first')
+    File.open(tar, 'r+b') do |f|
+      data = f.read
+      f.seek(data.rindex("\0" * 1024))
+      Gem::Package::TarWriter.new(f) { |t| t.add_file_simple('a.txt', 0o644, 6) { |io| io.write('second') } }
+    end
+    assert_equal 'first', stored_asset(tar, 'a.txt')
+  end
+
   private
+
+  def store_listing(archive_path)
+    worker = zippy_worker(target: target_of(archive_path), request: fake_request)
+    assert worker.preview(File.new(archive_path))
+  end
+
+  def asset_target(archive_path, asset)
+    File.join(File.dirname(target_of(archive_path)), asset)
+  end
+
+  # an asset converted into the cache, as a link of the listing asks for it
+  def stored_asset(archive_path, asset)
+    zippy_worker(target: asset_target(archive_path, asset), asset: asset).preview(File.new(archive_path))
+  end
 
   def path(name)
     File.join(FileUtils.mkdir_p(File.join(@tmp, 'archives')).first, name)

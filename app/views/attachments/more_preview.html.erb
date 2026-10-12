@@ -29,7 +29,7 @@
     </div>
   <%- when "jpg", "jpeg", "png", "gif" %>
     <div id="preview_repository_entry_top">
-      <%= call_hook(:preview_attachment_top, :attachment => @attachment, :project => @project, :params => request.query_parameters.merge(:request => request).symbolize_keys ) %>
+      <%= call_hook(:preview_attachment_top, :attachment => @attachment, :project => @project, :params => preview_query_parameters.merge(:request => request).symbolize_keys ) %>
     </div>
     <div>
     <%= image_tag(
@@ -37,12 +37,12 @@
           more_preview_url(
             @attachment, 
             RedmineMorePreviews::Converter.conversion_ext(@attachment.diskfile), 
-            request.query_parameters
+            preview_query_parameters
           ) :
           more_preview_path(
             @attachment, 
             RedmineMorePreviews::Converter.conversion_ext(@attachment.diskfile), 
-            request.query_parameters
+            preview_query_parameters
           ), 
           :alt => @attachment.filename,
           :style => "max-width:95%"
@@ -57,7 +57,7 @@
       });
     </script>
     <div id="preview_repository_entry_top">
-      <%= call_hook(:preview_attachment_top, :attachment => @attachment, :project => @project, :params => request.query_parameters.merge(:request => request).symbolize_keys ) %>
+      <%= call_hook(:preview_attachment_top, :attachment => @attachment, :project => @project, :params => preview_query_parameters.merge(:request => request).symbolize_keys ) %>
     </div>
     <div>
     <%= more_previews_tag(
@@ -65,12 +65,12 @@
           more_preview_url(
             @attachment, 
             RedmineMorePreviews::Converter.conversion_ext(@attachment.diskfile), 
-            request.query_parameters
+            preview_query_parameters
           ) :
           more_preview_path(
             @attachment, 
             RedmineMorePreviews::Converter.conversion_ext(@attachment.diskfile), 
-            request.query_parameters
+            preview_query_parameters
           ), 
           @attachment.filename,
          :type => RedmineMorePreviews::Converter.conversion_mime(@attachment.diskfile)
