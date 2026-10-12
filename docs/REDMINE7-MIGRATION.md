@@ -20,7 +20,7 @@ what is left. Written 2026-10-06 from a measured analysis (report at the bottom)
 | Upstream | HugoHasenbein/redmine_more_previews main @ 0bca937b36c56e3114e582b9bdf3384814d394ca (2025-02-13, 5.0.9) |
 | Runs on Redmine 7 as is | NEE (boot) |
 | Runs on Redmine 7 after this branch | JA: tests and e2e green on PostgreSQL 16 (see "Results"); also with the other GEOxyz plugins, apart from their own defects listed there |
-| Migration session | done 2026-10-06; Jan's decisions of 2026-10-07 and round 4 (2026-10-11) built (see "Decided by Jan") |
+| Migration session | done 2026-10-06; Jan's decisions of 2026-10-07, round 4 (2026-10-11) and round 5 (2026-10-12, security fixes of curecodejp 6.1.2: conversion limits, Vince) built (see "Decided by Jan") |
 | Upstream sync | UPSTREAM DOOD: nothing upstream; fork already equals upstream 5.0.9 + 2 own commits; claude/redmine7-rails8-compat 4eb8dea cherry-picked |
 | After sync | n.v.t. |
 | Complexity (1 trivial .. 5 rewrite) | 3 |
@@ -126,6 +126,8 @@ These GEOxyz commits are on the branch GEOxyz runs today and therefore on this b
 | same, with 37 other GEOxyz plugins (all `redmine70-migration`: 30 public, 7 private) | PostgreSQL 16.15 | 56 runs, 422 assertions, 0 failures, 0 errors, 0 skips |
 | 7.0-stable-GEOxyz, after round 4 (`5f38162`) | PostgreSQL 16.15 | 62 runs, 466 assertions, 0 failures, 0 errors, 0 skips |
 | same, with the 37 other GEOxyz plugins (heads of 2026-10-11) | PostgreSQL 16.15 | 62 runs, 466 assertions, 0 failures, 0 errors, 0 skips |
+| 7.0-stable-GEOxyz, after round 5 (`3c25209`) | PostgreSQL 16.15 | 252 runs, 1457 assertions, 0 failures, 0 errors, 0 skips |
+| same, with the 37 other GEOxyz plugins (heads of 2026-10-12) | PostgreSQL 16.15 | 252 runs, 1457 assertions, 0 failures, 0 errors, 0 skips |
 | (former, 5.1 no longer required) 5.1-stable, Ruby 3.2.6, at `c19f76f` | PostgreSQL 16 | 46 runs, 361 assertions, 0 failures, 0 errors, 0 skips |
 
 Boot and production eager load: OK (the e2e server runs in production mode). Migrations: the plugin
@@ -139,8 +141,10 @@ has none.
 | MariaDB 10.11 (`docs/e2e/mariadb/`) | 15 | 6 | 8 scripts, 46 screenshots | 0 |
 | MariaDB + 3 other GEOxyz plugins (not committed) | 15 | 6 | 8 scripts, 46 screenshots | 0 |
 | PostgreSQL 16 after Jan's decisions (`docs/e2e/`, replaces the run above) | 15 | 6 | 9 scripts, 62 screenshots | 0 |
-| PostgreSQL 16 after round 4 (`docs/e2e/`, current) | 15 | 6 | 11 scripts, 77 screenshots | 0 |
-| PostgreSQL 16 with all 37 other GEOxyz plugins, round 4 (`docs/e2e/combined/`, current) | 16 | 6 | 11 scripts, 77 screenshots | 1, not from this plugin (redmine_view_issue_description's 403) |
+| PostgreSQL 16 after round 5 (`docs/e2e/`, current) | 15 | 6 | 13 scripts, 89 screenshots (helpdesk_mail checks nothing without the helpdesk) | 0 |
+| PostgreSQL 16 with all 37 other GEOxyz plugins, round 5 (`docs/e2e/combined/`, current) | 16 | 6 | 13 scripts, 93 screenshots | 1, not from this plugin (redmine_view_issue_description's 403) |
+| PostgreSQL 16 after round 4 | 15 | 6 | 11 scripts, 77 screenshots | 0 |
+| PostgreSQL 16 with all 37 other GEOxyz plugins, round 4 | 16 | 6 | 11 scripts, 77 screenshots | 1, not from this plugin (redmine_view_issue_description's 403) |
 | (2026-10-07) PostgreSQL 16 with 36 other GEOxyz plugins | 16 | 6 | 9 scripts, 61 screenshots | 4, none from this plugin (below) |
 | before: GEOxyz `main` on Redmine 5.1 (`docs/e2e/before/`) | - | - | 8 scripts | 65 problems, as expected: traversal LEAK, mail XSS ran, textile 500, JS errors, empty zip downloads |
 
@@ -172,7 +176,7 @@ migration sessions; this plugin's scenarios pass there):
 |---|---|---|---|
 | Preview takeover of an attachment (module on, converter active) | click an attachment | converters, permissions | converters-sample-*.png |
 | Libre: docx/odt/xlsx/csv... via LibreOffice (pdf, html, png) | attachment | converters | converters-sample-docx/odt/xlsx/csv |
-| Cliff: eml, headers box, all header fields, Unsafe reload | attachment | mail | mail-headers, mail-unsafe-reload, mail-hostile |
+| Cliff: eml, headers box, all header fields, Unsafe reload (administrators only) | attachment | mail | mail-headers, mail-unsafe-reload, mail-hostile |
 | Vince: vcf business card | attachment, repository | converters, repository | converters-sample-vcf, repository-sample-vcf |
 | Mark: md (html), textile (inline) via pandoc | attachment, repository | converters, repository | converters-sample-md/textile, repository-sample-md |
 | Pass: html as is (sandboxed) | attachment | converters, security | converters-sample-html, security-sandbox |
@@ -182,7 +186,7 @@ migration sessions; this plugin's scenarios pass there):
 | Zippy: zip/tar/tgz listing, download of files (also in folders) | attachment, repository | archives, converters, repository | archives-*, repository-sample-zip |
 | Nil Text (debug converter) | settings only (not for production, says its own warning) | settings | settings-double |
 | Navigation between the attachments of a container | pagination under the preview | converters | converters-navigation-next |
-| Update (reload) of a cached preview | "Update" link | converters | converters-reload |
+| Update (reload) of a cached preview, administrators only since round 5 | "Update" link | converters, limits | converters-reload, limits-reload-users, limits-links-admin/manager |
 | Repository entry preview + more_preview/more_asset routes | Repository > file | repository | repository-*.png |
 | Plugin settings: embedding object/iframe, absolute URL, cache, debug, converters, formats, double type warning, help | Administration > Plugins > Configure | settings | settings-*.png |
 | Project module "Redmine More Previews" | Project settings > Modules | permissions | permissions-module-off/on |
@@ -194,7 +198,14 @@ migration sessions; this plugin's scenarios pass there):
 | File type icons in attachment lists (CSS hook) | any attachment list | converters | converters-issue-attachments |
 | Refusals: non-member on private project, anonymous, non-admin on settings and info | URL | permissions, settings, admin_info | *-refused, *-anonymous, permissions-outsider-page |
 | Failure paths: traversal, no converter, unknown id, no format | URL | security (+ integration tests) | security-traversal-404 |
-| REST API, mail in/out, rake, cron | the plugin has none | - | - |
+| Conversion limits on the settings page (round 5; Cliff and Zippy limits in their own boxes) | Administration > Plugins > Configure | limits | limits-settings |
+| Archive bomb and zip of too many entries refused (413) | attachment preview / asset | limits | limits-bomb-listing, limits-archives-413, limits-many-page |
+| Email too large, too deeply nested, of too many parts: refused with the reason | attachment | limits | limits-emails-refused, limits-nested-page |
+| A converter program that hangs: stopped at the time limit with its process group, failure remembered | attachment preview | limits | limits-hang |
+| Cache clean rake task `redmine_more_previews:cache:clean DAYS=30` | cron, see "After the upgrade" | limits | limits-cache-clean |
+| Hostile vCard: name as text, no javascript: links, no GEO map link from an injected value, no file: photo | attachment | limits | limits-hostile-vcard |
+| Hostile customer email as message.eml on a helpdesk ticket (combined run with redmine_contacts_helpdesk) | helpdesk ticket attachment | helpdesk_mail | combined/helpdesk_mail-*.png |
+| REST API, mail in/out | the plugin has none | - | - |
 
 ### Reviews
 
@@ -202,6 +213,11 @@ migration sessions; this plugin's scenarios pass there):
 - OpenAI review (gpt-5): `docs/reviews/openai-2026-10-06-c19f76f.md` (5 findings: 2 fixed, 3 not
   defects, with reasons) and a second pass `docs/reviews/openai-2026-10-06-700d486.md` (nothing new
   accepted). Every finding has a resolution.
+
+- Round 5 (2026-10-12): own review by an independent reviewer of `7e7886a..HEAD` (13 findings: 10
+  fixed or mitigated with tests in `1635550`, `5f02e97`, `3c25209`; the rest recorded with reasons under "Round 5"
+  above) and OpenAI review (gpt-5) `docs/reviews/openai-2026-10-12-d78c880.md` (4 findings: 1 fixed,
+  3 not defects, with reasons).
 
 ### Not tested here (needs production or is out of reach)
 
@@ -278,6 +294,57 @@ then falls back to the requested revision; the 5.1 cache below `repository/` sta
 image name (pre-existing, upstream does the same; the response is sandboxed): GEOxyz installs
 Ghostscript, and Maggie is off after the hand-over task.
 
+**Round 5, 2026-10-12: security fixes of curecodejp/redmine_more_previews v6.1.2** (Jan's decision in
+`docs/DECISIONS-2026-10-07.md`, section "Round 5"; ported by hand in upstream's order, the upstream
+commits named in each commit, upstream's tests ported where they fit):
+
+| part | here | tests (each fails without its change) |
+|---|---|---|
+| time limit for every converter command, whole process group stopped (TERM, then KILL), Libre at least 120 s | `d0b3d71` (RmpProcess.run, Conversion#command with one deadline per conversion) | rmp_process_test (Windows skips removed, zombies of a container without init counted as stopped), conversion_timeout_test |
+| at most `max_conversions` at once over all processes (flock slots), bounded waits, 503 with Retry-After beyond | `cf54a80` | preview_busy_test, conversion_limits_test |
+| Peek's PDF images through the plugin's `convert` with Maggie's `-limit`s and the `pdf:` coder | `0f5d262` | peek_test |
+| the limits as plugin settings, described on the settings page; a missing or non-positive value falls back to the default | `28029fd` (+ later parts) | plugin_settings_limits_test |
+| Cliff: size (50 MiB), parts (1,000), attachments listed (1,000), names in a loop | `0601757` | cliff_limits_test |
+| repository files (50 MiB, unknown size refused), Zippy (10,000 entries, 1 GiB unpacked, 100 MiB per entry, 1 GiB stored per archive, 64 levels), previews (100 MiB), cache (10 GiB); 413 | `8098c19`: Zippy rebuilt on upstream's walk with our repository link routing; the zip entry count follows **rubyzip 3.4** (Redmine 7), not 2.4 as upstream | zippy_limits_test (zip64 cases adapted), preview_busy_test, conversion_limits_test |
+| failures remembered (10 min, `failure_ttl`), reload/unsafe for administrators only, links hidden for others | `da37223`, `74f59fc` (inline previews, the preview's own name as asset, normalized asset names) | preview_reload_failures_test, attachment_previews_test |
+| rake task `redmine_more_previews:cache:clean DAYS=30` | `72a3a9e`, in our rake file next to `use_core_previews` | cache_clean_test (+ the task itself) |
+| Cliff parses in a forked child (time limit, 1 GiB address space, resident memory watched), delimiters counted after any line break, nesting and parsed bodies bounded on Mail's parts, long mbox "From " line refused | `0087565` | cliff_limits_test, rmp_process_test (the lone CR test no longer asserts that Mail splits there: Mail 2.9 does not) |
+| Zippy assets from the stored list, failures per preview and asset | `dcc28a5`; rubyzip 3's `EntrySizeError.new(entry)`; the pages no longer forward an `asset` parameter to the frame | attachments_more_asset_test (frame is an `<object>` with embedding 0) |
+| why an email is not previewed, without backtrace or message; the refusal reasons translated (upstream: English only) | `f448b14` | cliff_limits_test, cliff_body_test |
+| Vince: name escaped, URI links only for http(s), ftp, mailto, tel, geo (IMPP also xmpp, sip(s), im, skype), GEO only with valid coordinates; PHOTO/LOGO `file:` branch removed (024bd62, 6.1.0) | `6706d5a` | vince_uri_link_test, vince_uri_image_test, vince_html_template_test (FN only) |
+
+Found while sweeping all upstream commits since 5.0.9 for security fixes beyond the two parts Jan named:
+Cliff's quoted-printable text body reached the page as markup (marked `html_safe`, so `html_escape`
+passed it through): fixed in `5061ee0` (upstream 1e6cd63, fe225e3, 771fb29). Cliff stderr fix
+f030e1f taken (`6ce3904`): the Cliff port touches that code and the warnings flooded stderr with
+megabytes per hostile email (seen in our own test runs). The unused template copies under
+`lib/cliff` are kept equal to `app/views` by a test.
+
+Own review (independent reviewer, read-only) of `7e7886a..HEAD`, fixed with tests in `1635550` and
+`5f02e97`: Zippy built its links from all request parameters, so `?script_name=//host` on the first
+request stored a listing whose links pointed elsewhere (now the route's parameters only, the
+revision kept); inline previews let query keys set converter attributes (`?timeout=x` gave 500);
+Cliff's header boxes, converted while the email page renders, turned the whole page into the 503
+when no slot was free; without the cache a missing asset gave an empty 200; an empty `asset`
+parameter raised TypeError; `Repository#asset_link` called `Pathname.new` with three arguments
+(pre-existing, hid repository emails with stored attachments); attachments named `.` or `..`;
+Vince logged a card's values. Not changed, recorded: the email page still converts the header
+boxes on every view (bounded by the slots now; upstream does the same); Ruby converters (Zippy's
+walk, Vince) are bounded in size, not in time (as upstream); `<dir>.lock` files stay (by design,
+small); Vince's escaping round-trip (upstream e53dd40) and Cliff's Cc row for a String value are
+display issues, not security.
+
+Not ported, differences to upstream 6.1.2 that stay (Jan: keep our sandbox CSP): upstream's CSP
+`default-src 'none'; img-src 'self' data:` for HTML previews and its inline scrubber dropping
+off-site `<img src>` (4d18e6f) and the `name` attribute (c1d719f). Ours sandboxes without a
+`default-src`, so an HTML email or document may still load remote images when previewed (no
+scripts, opaque origin). A candidate for a later decision.
+
+Behaviour to know: an email beyond Cliff's limits is not answered with 413 as the decision text
+says, but with its preview stating the reason (upstream's design; the e2e checks the text). A
+refused or failed preview inside the `<object>` frame (embedding 0) shows an empty frame: browsers
+render no error body there (as for 404 and 503 before).
+
 ## After the upgrade (production)
 
 Actions the person doing the upgrade must take, or know about, for this plugin:
@@ -310,6 +377,26 @@ Actions the person doing the upgrade must take, or know about, for this plugin:
 - Check once in a real browser that a PDF preview (peek, or libre to pdf) shows in the page.
 - No rotation of passwords or secret keys after the upgrade (Jan, 2026-10-07, q1: "Niet nodig, alleen
   vertrouwde gebruikers").
+- Conversion limits (round 5; Administration > Plugins > More previews > Conversion limits, Cliff
+  and Zippy have their own): the defaults are upstream's and fit GEOxyz: time limit 60 s (Libre at
+  least 120 s; raise it if office documents of several hundred pages must be previewed), wait 5 s,
+  2 conversions at once over all Redmine processes, repository files 50 MiB, previews 100 MiB, cache
+  10 GiB, failures remembered 10 min; Cliff 50 MiB / 1,000 parts / 1,000 attachments, Zippy 10,000
+  entries / 1 GiB unpacked / 100 MiB per entry / 1 GiB stored per archive. Raise "conversions at
+  once" only with CPU and memory to spare; with several Redmine servers on one shared
+  `tmp/more_previews` (NFS) the count may hold per server only.
+- Memory (upstream 854355f): a preview is served from memory, up to 100 MiB, and requests for cached
+  previews are not bounded by the conversion count, so a server may need that limit times the
+  requests it serves at once (Puma/Passenger processes times threads). Each Cliff conversion forks a
+  child stopped at 1 GiB of resident memory growth (address space limit twice that); with 2 conversions at once plan about 2 GiB on top of
+  Redmine for the worst case. Where memory is short, lower "Largest preview served" or the
+  number of processes and threads.
+- Schedule the cache clean daily, f.i. in the Redmine user's crontab:
+  `17 3 * * * cd <redmine> && RAILS_ENV=production bundle exec rake redmine_more_previews:cache:clean DAYS=30`
+  (removes previews cached more than 30 days ago and failures remembered longer than their time;
+  a preview in use is skipped and removed on the next run).
+- Only administrators can reload a preview or ask for Cliff's unsafe preview now; tell the users
+  the "Update" link is gone for them.
 
 ## How to test
 
