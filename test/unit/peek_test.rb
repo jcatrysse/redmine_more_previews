@@ -59,7 +59,7 @@ class PeekTest < ActiveSupport::TestCase
   # installed ImageMagick and Ghostscript
   def test_peek_converts_a_real_pdf
     Redmine::Thumbnail.unstub(:gs_available?)
-    assert Redmine::Thumbnail.convert_available? && Redmine::Thumbnail.gs_available?, 'ImageMagick and Ghostscript are needed'
+    skip 'ImageMagick and Ghostscript are needed' unless Redmine::Thumbnail.convert_available? && Redmine::Thumbnail.gs_available?
     source = File.join(Dir.mktmpdir('src', @dir), 'real.pdf')
     FileUtils.cp(File.join(RedmineMorePreviews::TestHelper::FILES, 'sample.pdf'), source)
     worker = peek(source, 'png')
