@@ -181,6 +181,7 @@ module RedmineMorePreviews
     ensure
       if slot
         Thread.current[:redmine_more_previews_slot] = nil
+        slot.flock( File::LOCK_UN ) # see with_cache_lock
         slot.close
       end
     end #def
@@ -329,7 +330,13 @@ module RedmineMorePreviews
       FileUtils.mkdir_p( File.dirname( dir ) )
       File.open( "#{dir}.lock", File::RDWR | File::CREAT, 0644 ) do |lock|
         wait_for( "preview #{dir}" ) { lock.flock( File::LOCK_EX | File::LOCK_NB ) }
-        yield
+        begin
+          yield
+        ensure
+          # closing alone keeps the lock while a child forked meanwhile, by
+          # another request, holds the file (see Lib::RmpProcess.fork)
+          lock.flock( File::LOCK_UN )
+        end
       end
     end #def
     private :with_cache_lock
@@ -532,6 +539,20 @@ module RedmineMorePreviews
       raise
     end #def
     
+    # runs the block in a child process within the time left for the conversion
+    # and, where it can be bounded, memory bytes (see Lib::RmpProcess.fork): for a
+    # converter that parses the file in Ruby. The block's results must be files
+    def isolated( memory: )
+      remaining = @deadline ? @deadline - Lib::RmpProcess.now : conversion_timeout
+      raise ConverterTimeout, "no time left" unless remaining > 0
+      return true if Lib::RmpProcess.fork( :timeout => remaining, :memory => memory ) { yield }
+      Rails.logger.error("Creating preview with #{name} failed in its child process")
+      raise ConverterShellError
+    rescue ConverterTimeout
+      Rails.logger.error("Creating preview with #{name} timed out after #{conversion_timeout}s")
+      raise
+    end #def
+
     # seconds all the commands of one conversion may run together: the plugin
     # setting, or more if the converter needs it (Libre starts slowly)
     def conversion_timeout

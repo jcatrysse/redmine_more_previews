@@ -45,8 +45,19 @@ class Cliff < RedmineMorePreviews::Conversion
   # A converter setting overrides each default.
   LIMITS         = {'max_size' => 50, 'max_parts' => 1000, 'max_attachments' => 1000}.freeze
   
-  # each multipart part declares a boundary: bounds the nesting of parts as well
-  MAX_MULTIPARTS = 100
+  # nested multipart parts: Mail's helpers (attachments, html_part, ...) walk
+  # the whole tree again and again, in more than linear time in its depth,
+  # and Mail keeps the body of every level, so the bodies parsed add up to
+  # the size of the email times the depth. Both are bounded, the bodies by a
+  # multiple of the size limit
+  MAX_DEPTH      = 100
+  MAX_PARSED     = 5
+  
+  # Mail's patterns keep state for every byte of some header lines, some 50
+  # times the email in memory, and nothing short of parsing tells which: the
+  # email is parsed in a child process with this much memory (see
+  # Conversion#isolated)
+  MAX_MEMORY     = 1024 * 1024 * 1024
   
   ########################################################################################
   #
@@ -56,7 +67,12 @@ class Cliff < RedmineMorePreviews::Conversion
   def convert
     case preview_format
     when 'html'
-      eml
+      # what the child needs from the database is read here, before the fork,
+      # and the translations loaded, which takes seconds the first time
+      LIMITS.each_key {|key| limit( key ) }
+      object.to_h["object"].try( :project )
+      I18n.translate( :"redmine_more_previews.cliff.text_more_attachments", :count => 0 )
+      isolated( :memory => max_memory ) { eml }
     end
   end #def
   
@@ -78,6 +94,7 @@ class Cliff < RedmineMorePreviews::Conversion
     text  = RmpText.to_utf8(File.read(source))
     check_parts( text )
     mail  = Mail.new(text)
+    check_depth( mail )
     
     # get html
     html, charset = html( mail )
@@ -118,8 +135,10 @@ class Cliff < RedmineMorePreviews::Conversion
     
     File.open(tmptarget, "wb") {|f| f.write html }
     
-  rescue Exception => e
-    # the message can quote the mail being parsed, so it is attacker controlled
+  rescue StandardError => e
+    # running out of memory or a signal is no error of the email: the child
+    # fails (see Conversion#isolated), no error page is stored.
+    # The message can quote the mail being parsed, so it is attacker controlled
     File.open(tmptarget, "wb") {|f| f.write (([e.message] + e.backtrace).map{|line| ERB::Util.html_escape(line)}.join("<br>\n")) }
   end #def
   
@@ -265,25 +284,63 @@ class Cliff < RedmineMorePreviews::Conversion
   #---------------------------------------------------------------------------------------
   # limits
   #---------------------------------------------------------------------------------------
-  def limit( key )
-    value = converter_settings[key].to_i
-    value > 0 ? value : LIMITS[key]
+  def max_memory
+    MAX_MEMORY
   end #def
   
-  # counts the declared multipart boundaries and the delimiter lines of the raw
-  # message, an upper bound of what Mail would parse
-  def check_parts( text )
-    boundaries = text.scan(/boundary\s*=\s*(?:"([^"]*)"|([^\s;"]+))/i).map{|quoted, bare| quoted || bare}.to_set
-    return if boundaries.empty?
-    if boundaries.size > MAX_MULTIPARTS
-      raise ConverterBadArgument, "the email has more than #{MAX_MULTIPARTS} multipart parts"
+  def limit( key )
+    @limits ||= {}
+    @limits[key] ||= begin
+      value = converter_settings[key].to_i
+      value > 0 ? value : LIMITS[key]
     end
-    parts = 0
-    text.each_line do |line|
-      next unless line.start_with?("--")
-      next unless boundaries.include?( line[2..].rstrip.delete_suffix("--") )
-      parts += 1
-      raise ConverterBadArgument, "the email has more than #{limit('max_parts')} parts" if parts > limit('max_parts')
+  end #def
+  
+  # a line starting with "--": Mail splits a part at a line of "--" and its
+  # boundary, which it reads in forms no simple pattern follows (quoted, with
+  # comments, RFC 2231, empty ...), after making every CR, LF or CRLF a line
+  # break. Every such line is counted
+  DELIMITER = /(?:\A|[\r\n])--/
+  
+  # the text Mail's pattern for an mbox "From " line runs over: "From", white
+  # space (line breaks included), a character and the ASCII text after it, of
+  # which the rest of the line is an upper bound. The pattern keeps
+  # state for every byte it runs over, some 50 times the text in memory, so the
+  # run is bounded by the longest line of a message (RFC 5322) first, on no
+  # more of the text than that
+  ENVELOPE      = /\AFrom\s*[^\r\n]*/n
+  MAX_LINE      = 998
+  
+  # counts the delimiter lines of the raw message, an upper bound of the parts
+  # Mail would parse, and stops at the first one beyond the limit
+  def check_parts( text )
+    if text.start_with?( "From" ) && text.byteslice( 0, MAX_LINE + 1 ).b[ENVELOPE].bytesize > MAX_LINE
+      raise ConverterBadArgument, "the email starts with a \"From\" line longer than #{MAX_LINE} characters"
+    end
+    count = 0
+    text.scan( DELIMITER ) do
+      count += 1
+      raise ConverterBadArgument, "the email has more than #{limit('max_parts')} parts" if count > limit('max_parts')
+    end
+  end #def
+  
+  # walks the parts as Mail reads them, before anything walks the whole tree:
+  # Mail splits the body of a part only when its parts are asked for, so
+  # nothing beyond the limits is parsed. Whether a part is multipart is Mail's
+  # decision, not a guess from the raw text
+  def check_depth( mail )
+    budget = MAX_PARSED * limit('max_size') * 1024 * 1024
+    parsed = 0
+    stack  = [[mail, 1]]
+    until stack.empty?
+      part, depth = stack.pop
+      next unless part.multipart?
+      raise ConverterBadArgument, "the email has more than #{MAX_DEPTH} nested multipart parts" if depth > MAX_DEPTH
+      parsed += part.body.raw_source.to_s.bytesize
+      if parsed > budget
+        raise ConverterBadArgument, "the nested multipart parts of the email add up to more than #{MAX_PARSED * limit('max_size')} MiB"
+      end
+      part.parts.each {|child| stack.push( [child, depth + 1] ) }
     end
   end #def
   

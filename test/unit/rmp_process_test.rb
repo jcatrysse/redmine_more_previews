@@ -67,6 +67,88 @@ class RmpProcessTest < ActiveSupport::TestCase
     assert_process_gone File.read(child).to_i
   end
 
+  # --- a block in a forked child ------------------------------------------------------
+
+  def test_block_runs_in_a_child_and_leaves_files
+    out = File.join(@dir, 'out')
+    assert RmpProcess.fork(timeout: 5) { File.write(out, Process.pid.to_s) }
+    assert_not_equal Process.pid, File.read(out).to_i
+  end
+
+  def test_block_that_raises_is_reported
+    assert_not RmpProcess.fork(timeout: 5) { raise 'broken' }
+  end
+
+  def test_block_is_stopped_at_the_time_limit
+    out = File.join(@dir, 'pid')
+    elapsed = measure do
+      assert_raises(ConverterTimeout) { RmpProcess.fork(timeout: 1) { File.write(out, Process.pid.to_s); sleep 30 } }
+    end
+    assert_operator elapsed, :<, 5
+    assert_process_gone File.read(out).to_i
+  end
+
+  # a server's TERM handler must not run in the child: the child is stopped
+  def test_child_ignores_the_signal_handlers_of_the_server
+    handled = File.join(@dir, 'handled')
+    old = Signal.trap('TERM') { File.write(handled, 'yes') }
+    assert_raises(ConverterTimeout) { RmpProcess.fork(timeout: 1) { sleep 30 } }
+    assert_not File.exist?(handled)
+  ensure
+    Signal.trap('TERM', old || 'DEFAULT')
+  end
+
+  def test_child_runs_out_of_memory_not_the_server
+    assert File.readable?('/proc/self/status'), 'the address space is read from /proc (Linux)'
+    assert_not RmpProcess.fork(timeout: 30, memory: 64 * 1024 * 1024) { 'x' * (512 * 1024 * 1024) }
+    assert RmpProcess.fork(timeout: 30, memory: 64 * 1024 * 1024) { 'x' * (8 * 1024 * 1024) }
+  end
+
+  # the address space is limited to twice the memory: a child within it is
+  # stopped for its resident memory, which also counts the free memory it
+  # inherited and reuses
+  def test_child_is_stopped_for_its_resident_memory
+    assert File.readable?('/proc/self/status'), 'the memory is read from /proc (Linux)'
+    elapsed = measure do
+      assert_not RmpProcess.fork(timeout: 30, memory: 64 * 1024 * 1024) { kept = 'x' * (100 * 1024 * 1024); sleep 20; kept.size }
+    end
+    assert_operator elapsed, :<, 10
+  end
+
+  # the child's garbage collection writes to most of the heap it inherits,
+  # copying pages that were resident already: that is no memory it takes
+  def test_child_collecting_garbage_in_a_large_parent_is_not_stopped
+    assert File.readable?('/proc/self/statm'), 'the memory is read from /proc (Linux)'
+    live = Array.new(500_000) { 'z' * 200 }
+    assert RmpProcess.fork(timeout: 30, memory: 64 * 1024 * 1024) { GC.start; GC.start; sleep 1 }
+    assert live.size
+  end
+
+  # a signal stops the child at once: Ruby's DEFAULT would raise
+  # SignalException, which a rescue Exception in the block would take
+  def test_signal_stops_the_child_at_once
+    out = File.join(@dir, 'rescued')
+    elapsed = measure do
+      assert_raises(ConverterTimeout) do
+        RmpProcess.fork(timeout: 1) do
+          sleep 30
+        rescue Exception
+          File.write(out, 'yes')
+          sleep 30
+        end
+      end
+    end
+    assert_not File.exist?(out)
+    assert_operator elapsed, :<, 3
+  end
+
+  # the child leaves with exit!: no at_exit hook of the parent runs in it
+  def test_child_runs_no_at_exit_hooks
+    ran = File.join(@dir, 'at_exit')
+    assert RmpProcess.fork(timeout: 5) { at_exit { File.write(ran, 'yes') } }
+    assert_not File.exist?(ran)
+  end
+
   private
 
   def measure
