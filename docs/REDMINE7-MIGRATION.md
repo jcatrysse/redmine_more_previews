@@ -338,7 +338,11 @@ Not ported, differences to upstream 6.1.2 that stay (Jan: keep our sandbox CSP):
 `default-src 'none'; img-src 'self' data:` for HTML previews and its inline scrubber dropping
 off-site `<img src>` (4d18e6f) and the `name` attribute (c1d719f). Ours sandboxes without a
 `default-src`, so an HTML email or document may still load remote images when previewed (no
-scripts, opaque origin). A candidate for a later decision.
+scripts, opaque origin). Jan, 2026-10-12: keep it so. Helpdesk customer emails do not reach
+this plugin in the interface: redmine_contacts_helpdesk opens a ticket's `message.eml` in its own
+`helpdesk_email_preview`, and Cliff already removes remote images unless an administrator asks for
+the unsafe preview; what is left (Vince photos by URL, images linked from Office documents) is too
+small a risk to change.
 
 Behaviour to know: an email beyond Cliff's limits is not answered with 413 as the decision text
 says, but with its preview stating the reason (upstream's design; the e2e checks the text). A
