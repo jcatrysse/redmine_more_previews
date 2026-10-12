@@ -83,6 +83,17 @@ class CliffBodyTest < ActiveSupport::TestCase
   # cliff ships a second copy of its templates next to the library, and that is
   # the one a packaged install renders; escaping only one of them would leave
   # the exposure in place where it is hardest to notice
+  # the Cc row showed the sender when Mail gave the Cc as a String
+  def test_cc_given_as_a_string_is_shown
+    @mail = Mail.new("From: alice@example.net\nTo: bob@example.net\nSubject: s\n\nbody")
+    @mail.stubs(:cc).returns('carol@example.net')
+    template = File.expand_path('../../converters/cliff/app/views/cliff/headers.html.erb', __dir__)
+    html = ERB.new(File.read(template)).result(binding)
+    cc_row = html[/#{Regexp.escape(I18n.translate(:label_mail_field_cc))}.*?<\/tr>/m]
+    assert_includes cc_row, 'carol@example.net'
+    assert_not_includes cc_row, 'alice@example.net'
+  end
+
   def test_bundled_template_copies_are_in_sync
     %w(pre headers fields attachments).each do |name|
       app = File.expand_path("../../converters/cliff/app/views/cliff/#{name}.html.erb", __dir__)
