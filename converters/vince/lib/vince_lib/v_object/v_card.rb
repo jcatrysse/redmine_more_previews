@@ -226,13 +226,9 @@ module VObject
     ######################################################################################
     PHOTO_WEBALIZE_PROC = Proc.new do |hash|
       url = case hash[:fields][:scheme]
-      when /data/i, /http/i, /https/i
+      when /\A(?:data|https?)\z/i
         # this is a reference to a remote image: reassemble uri
         hash[:fields][:full]
-      when /file/i
-        # this is a reference to a local file
-        mime = Marcel::MimeType.for(Pathname.new(filepath), name: File.basename(filepath))
-        "data:#{mime};base64,#{Base64.encode64(open(hash[:fields][:path]){|f|f.read})}"
       when nil
         # this is a vcard 3.0 notation
         mime = case hash[:attributes][:TYPE].to_a.first
@@ -243,7 +239,9 @@ module VObject
         end
         "data:#{mime};base64,#{hash[:fields][:path]}"
       end
-      tag(:img, src: url, :class => "vcard photo box")
+      # file: and any other scheme are not rendered: the path comes from the uploaded
+      # vCard, so reading it would disclose files on the Redmine server
+      url.present? ? tag(:img, src: url, :class => "vcard photo box") : ""
     end #def
     
     PHOTO_HUMANIZE_PROC = Proc.new{|hash| ":-)"}
@@ -474,13 +472,24 @@ module VObject
     #                         / mediatype-param / altid-param / any-param
     #               GEO-value = URI
     ######################################################################################
+    # Only numeric coordinates may be embedded into the Google Maps path.
+    # RFC 5870 permits an optional altitude and semicolon-delimited parameters.
+    GEO_COORDINATES_PATTERN = /\A(-?\d{1,3}(?:\.\d+)?),(-?\d{1,3}(?:\.\d+)?)(?:,-?\d+(?:\.\d+)?)?(?:;[A-Za-z][A-Za-z0-9-]*=[A-Za-z0-9_.~%+-]+)*\z/
+
     GEO_WEBALIZE_PROC = Proc.new do |hash,iconize|
       icon = iconize.presence && "icon icon-geo"
-      link_to(
-        hash[:fields][:opaque], 
-        "https://www.google.com/maps/@#{hash[:fields][:opaque]},15z",
-        :class => "vcard geo #{icon}"
-      )
+      coordinates = hash[:fields][:opaque].to_s.match(GEO_COORDINATES_PATTERN)
+      if hash[:fields][:scheme].to_s.downcase == 'geo' &&
+         coordinates && coordinates[1].to_f.abs <= 90 && coordinates[2].to_f.abs <= 180
+        link_to(
+          hash[:fields][:opaque],
+          "https://www.google.com/maps/@#{coordinates[1]},#{coordinates[2]},15z",
+          :class => "vcard geo #{icon}"
+        )
+      else
+        # Invalid coordinates or other URI schemes remain escaped, non-clickable text.
+        content_tag(:span, hash[:fields][:full], :class => "vcard geo #{icon}")
+      end
     end
     
     def geo(*val, **att)
@@ -535,13 +544,9 @@ module VObject
     ######################################################################################
     LOGO_WEBALIZE_PROC = Proc.new do |hash|
       url = case hash[:fields][:scheme]
-      when /data/i, /http/i, /https/i
+      when /\A(?:data|https?)\z/i
         # this is a reference to a remote image: reassemble uri
         hash[:fields][:full]
-      when /file/i
-        # this is a reference to a local file
-        mime = Marcel::MimeType.for(Pathname.new(filepath), name: File.basename(filepath))
-        "data:#{mime};base64,#{Base64.encode64(open(hash[:fields][:path]){|f|f.read})}"
       when nil
         # this is a vcard 3.0 notation
         mime = case hash[:attributes][:TYPE].to_a.first
@@ -552,7 +557,9 @@ module VObject
         end
         "data:#{mime};base64,#{hash[:fields][:path]}"
       end
-      tag(:img, src: url, :class => "vcard logo box")
+      # file: and any other scheme are not rendered: the path comes from the uploaded
+      # vCard, so reading it would disclose files on the Redmine server
+      url.present? ? tag(:img, src: url, :class => "vcard logo box") : ""
     end #def
     
     LOGO_HUMANIZE_PROC = Proc.new{|hash| "|/|"}
