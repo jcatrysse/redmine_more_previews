@@ -60,6 +60,7 @@ module RedmineMorePreviews
           _filename  = _filename.gsub(_bad_chars, '_') if options[:ignore_delimiters]
           _filename  = File.basename( _filename ) 
           _filename  = _filename.presence || "noname"
+          _filename  = "noname" if %w(. ..).include?(_filename) # the directory itself, or its parent
           _extension = File.extname(  _filename)
           _filestem  = File.basename( _filename, _extension)
           # limit maximum length of filename to 260 characters

@@ -7,6 +7,10 @@
     toggler << link_to_function(" x", js, :id => "#{html_id}-hide", :class => 'collapsible', :style => 'display:none;')
   %>
   
+  <%# converted while the page is rendered: no free conversion slot, or an email
+      beyond the limits, leaves the boxes out instead of turning the page into a 503
+      (the preview frame below answers for itself) %>
+  <%- begin %>
   <%- repository.more_asset( path, rev, :assets => ["headers.html", "fields.html", "attachments.html"] ) do |html, asset, email_headers, email_fields, email_attachments| %>
   
     <% if email_headers %>
@@ -22,6 +26,8 @@
       <div class="box"><%= more_previews_inline(email_attachments) %></div>
     <%- end %>
     
+  <%- end %>
+  <%- rescue RedmineMorePreviews::Exceptions::ConverterLockTimeOut, RedmineMorePreviews::Exceptions::ConverterTooLarge %>
   <%- end %>
   
 <% end %>

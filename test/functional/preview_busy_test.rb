@@ -186,7 +186,8 @@ class RepositoriesPreviewBusyTest < Redmine::ControllerTest
     Repository.any_instance.unstub(:cat)
     get :entry, params: {id: PRJ_ID, repository_id: @repository.id, path: repository_path_hash(['a.zip'])[:param], format: 'html'}
     assert_response :success
-    assert_not_includes response.body, '/preview/'
+    # no preview frame or object (a plugin such as view_customize may name the path in a comment)
+    assert_select '[src*="/preview/"], [data*="/preview/"], #preview_pane', 0
   end
 
   # the repository page itself falls back to Redmine's own view of the file
@@ -194,7 +195,8 @@ class RepositoriesPreviewBusyTest < Redmine::ControllerTest
     RedmineMorePreviews::Converter.stubs(:max_repository_file).returns(10)
     get :entry, params: {id: PRJ_ID, repository_id: @repository.id, path: repository_path_hash(['a.zip'])[:param], format: 'html'}
     assert_response :success
-    assert_not_includes response.body, '/preview/'
+    # no preview frame or object (a plugin such as view_customize may name the path in a comment)
+    assert_select '[src*="/preview/"], [data*="/preview/"], #preview_pane', 0
   end
 
   # see PreviewReloadFailuresTest#test_inline_reload_by_a_member_is_served_from_the_cache

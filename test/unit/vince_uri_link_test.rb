@@ -80,4 +80,16 @@ class VinceUriLinkTest < ActiveSupport::TestCase
       assert_includes fragment.text, uri, uri
     end
   end
+
+  # parsing a card logged the raw values of its structured fields
+  def test_parsing_does_not_log_the_card
+    io = StringIO.new
+    logger = Rails.logger
+    Rails.logger = ActiveSupport::Logger.new(io)
+    VinceLib::VObject::Reader.new(object: :vcard,
+      string: "BEGIN:VCARD\r\nVERSION:4.0\r\nFN:Test\r\nN:Secretname;Given;;;\r\nADR:;;Secret street 1;Town;;;\r\nEND:VCARD\r\n").stringall.first.n.webalize
+    assert_not_include 'Secret', io.string
+  ensure
+    Rails.logger = logger
+  end
 end

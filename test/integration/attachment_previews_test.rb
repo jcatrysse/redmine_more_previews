@@ -280,6 +280,18 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  # an inline preview is converted with the page's query: a key named as a converter
+  # attribute must not set it (timeout=x raised ConverterWrongArgument, a 500)
+  def test_inline_preview_ignores_converter_attributes_in_the_query
+    attachment = preview_attachment(@issue, 'sample.textile')
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get "/attachments/#{attachment.id}", :params => { :timeout => 'x', :threadsafe => 'x', :shell_api => 'x' }
+      assert_response :success
+      assert_select '#preview_repository_entry_top + div h1', :text => 'Textile sample'
+    end
+  end
+
   def test_mail_with_one_cc_shows_the_cc
     mail = File.read(File.join(FILES, 'sample.eml')).sub("To: Bob Example <bob@example.net>\n", "To: Bob Example <bob@example.net>\nCc: carol@example.net\n")
     attachment = preview_attachment(@issue, 'cc.eml', mail)
@@ -378,6 +390,58 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
       get href
       assert_response :success
       assert_equal "hello inner\n", response.body
+    end
+  end
+
+  # the listing is stored and shown to everyone: query keys of the first request that
+  # are url options (script_name, anchor) or reload must not reach its links
+  def test_zip_links_are_built_from_the_route_only
+    attachment = preview_attachment(@issue, 'sample.zip')
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get "/attachments/more_preview/#{attachment.id}/index.html",
+          :params => { :script_name => '//evil.example', :anchor => 'x', :reload => '1' }
+      assert_response :success
+      href = css_select('a[download="hello.txt"]').first['href']
+      assert_equal "/attachments/more_preview/#{attachment.id}/index.html?asset=inner%2Fhello.txt", href
+      assert_not_include 'evil.example', response.body
+    end
+  end
+
+  def test_empty_asset_parameter_is_no_asset
+    attachment = preview_attachment(@issue, 'sample.zip')
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get "/attachments/more_preview/#{attachment.id}/index.html", :params => { :asset => '' }
+      assert_response :success
+      assert_select 'a[download="hello.txt"]'
+    end
+  end
+
+  # without the cache an asset is converted for each request: a missing entry is a 404
+  def test_missing_asset_without_the_cache_is_not_found
+    attachment = preview_attachment(@issue, 'sample.zip')
+    with_converters(CONVERTERS, 'cache_previews' => '0') do
+      log_user('jsmith', 'jsmith')
+      get "/attachments/more_preview/#{attachment.id}/index.html", :params => { :asset => 'inner/hello.txt' }
+      assert_response :success
+      assert_equal "hello inner\n", response.body
+      get "/attachments/more_preview/#{attachment.id}/index.html", :params => { :asset => 'no/such.txt' }
+      assert_response :not_found
+    end
+  end
+
+  # Cliff's headers above an email are converted while its page is rendered: no free
+  # conversion slot leaves them out, the page itself is shown (it was a bare 503)
+  def test_email_page_is_shown_when_the_conversions_are_busy
+    attachment = preview_attachment(@issue, 'sample.eml')
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      RedmineMorePreviews::Conversion.any_instance.stubs(:with_slot).raises(RedmineMorePreviews::Exceptions::ConverterLockTimeOut, 'busy')
+      get "/attachments/#{attachment.id}"
+      assert_response :success
+      assert_select '#preview_pane'
+      assert_select '#preview_repository_entry_top .box', 0
     end
   end
 

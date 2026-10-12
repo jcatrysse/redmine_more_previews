@@ -21,6 +21,14 @@ class RmpFileTest < ActiveSupport::TestCase
     end
   end
 
+  # an email attachment named "." or ".." was written over the directory (EISDIR),
+  # and the whole email was not previewed
+  def test_sanitize_does_not_name_a_directory
+    assert_equal 'noname', RmpFile.sanitize('..')
+    assert_equal 'noname', RmpFile.sanitize('.')
+    assert_equal '..txt', RmpFile.sanitize('..txt')
+  end
+
   def test_safe_relative_path
     assert RmpFile.safe_relative_path?('top.txt')
     assert RmpFile.safe_relative_path?('inner/hello.txt')

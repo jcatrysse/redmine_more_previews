@@ -51,7 +51,7 @@ module RedmineMorePreviews
           def more_preview
             @entry = @repository.entry(@path, @rev)
             if @entry&.convertible?
-              if params[:asset]
+              if @asset # an empty asset parameter is no asset (find_path_param)
                 @disposition = "attachment"
                 respond_to do |format|
                   format.any { send_more_asset }
@@ -129,11 +129,15 @@ module RedmineMorePreviews
               end
             else #no cache
               @repository.more_asset(@path, @rev, preview_params) do |preview_data, asset_data|
+                 # no such entry, or no output: answered with 404 below, not an empty 200
+                 next if asset_data.nil?
                  send_data asset_data,
                    :filename    => filename_for_content_disposition( File.basename(@asset) ),
                    :type        => Rack::Mime.mime_type( File.extname(@asset) ),
                    :disposition => @disposition || 'inline'
               end
+              # the conversion failed or timed out: nothing was yielded
+              render_404 unless performed?
             end
           end #def
           private :send_more_asset
@@ -174,8 +178,9 @@ module RedmineMorePreviews
               @paginator = Redmine::Pagination::Paginator.new(@entries.size, 1, index+1)
             end
             
-            if params[:asset]
-              find_path_param; return if performed?
+            find_path_param; return if performed?
+            # an empty asset parameter is no asset (find_path_param), the page is shown
+            if @asset
               @disposition = "attachment"
               respond_to do |format|
                 format.any { send_more_asset }

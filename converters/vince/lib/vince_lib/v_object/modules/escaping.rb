@@ -113,7 +113,6 @@ module VObject
       # unescapes a string value with semicolon separated values from ,;: and \n and returns array
       #
       def unesc_ssv_to_arr(ssv,n=nil)
-Rails.logger.info ssv
         ssv.split(*[/(?<!\\);/, n].compact).map{|s| unesc(s)}
       end #def
       
