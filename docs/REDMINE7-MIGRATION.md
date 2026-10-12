@@ -126,7 +126,7 @@ These GEOxyz commits are on the branch GEOxyz runs today and therefore on this b
 | same, with 37 other GEOxyz plugins (all `redmine70-migration`: 30 public, 7 private) | PostgreSQL 16.15 | 56 runs, 422 assertions, 0 failures, 0 errors, 0 skips |
 | 7.0-stable-GEOxyz, after round 4 (`5f38162`) | PostgreSQL 16.15 | 62 runs, 466 assertions, 0 failures, 0 errors, 0 skips |
 | same, with the 37 other GEOxyz plugins (heads of 2026-10-11) | PostgreSQL 16.15 | 62 runs, 466 assertions, 0 failures, 0 errors, 0 skips |
-| 7.0-stable-GEOxyz, after round 5 (`3c25209`) | PostgreSQL 16.15 | 252 runs, 1457 assertions, 0 failures, 0 errors, 0 skips |
+| 7.0-stable-GEOxyz, after round 5 (`f17dffa`) | PostgreSQL 16.15 | 252 runs, 1457 assertions, 0 failures, 0 errors, 0 skips |
 | same, with the 37 other GEOxyz plugins (heads of 2026-10-12) | PostgreSQL 16.15 | 252 runs, 1457 assertions, 0 failures, 0 errors, 0 skips |
 | (former, 5.1 no longer required) 5.1-stable, Ruby 3.2.6, at `c19f76f` | PostgreSQL 16 | 46 runs, 361 assertions, 0 failures, 0 errors, 0 skips |
 
@@ -215,7 +215,7 @@ migration sessions; this plugin's scenarios pass there):
   accepted). Every finding has a resolution.
 
 - Round 5 (2026-10-12): own review by an independent reviewer of `7e7886a..HEAD` (13 findings: 10
-  fixed or mitigated with tests in `1635550`, `5f02e97`, `3c25209`; the rest recorded with reasons under "Round 5"
+  fixed or mitigated with tests in `a2b9cc3`, `35fc297`, `f17dffa`; the rest recorded with reasons under "Round 5"
   above) and OpenAI review (gpt-5) `docs/reviews/openai-2026-10-12-d78c880.md` (4 findings: 1 fixed,
   3 not defects, with reasons).
 
@@ -320,8 +320,8 @@ f030e1f taken (`6ce3904`): the Cliff port touches that code and the warnings flo
 megabytes per hostile email (seen in our own test runs). The unused template copies under
 `lib/cliff` are kept equal to `app/views` by a test.
 
-Own review (independent reviewer, read-only) of `7e7886a..HEAD`, fixed with tests in `1635550` and
-`5f02e97`: Zippy built its links from all request parameters, so `?script_name=//host` on the first
+Own review (independent reviewer, read-only) of `7e7886a..HEAD`, fixed with tests in `a2b9cc3` and
+`35fc297`: Zippy built its links from all request parameters, so `?script_name=//host` on the first
 request stored a listing whose links pointed elsewhere (now the route's parameters only, the
 revision kept); inline previews let query keys set converter attributes (`?timeout=x` gave 500);
 Cliff's header boxes, converted while the email page renders, turned the whole page into the 503
