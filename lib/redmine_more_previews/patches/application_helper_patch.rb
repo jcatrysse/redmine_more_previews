@@ -23,6 +23,8 @@
 module RedmineMorePreviews
   module Patches 
     module ApplicationHelperPatch
+      WORKER_KEYS = %w(name preview_format threadsafe semaphore timeout shell_api mime_types settings version).freeze
+      
       INLINE_TAGS = %w(table thead tbody tfoot tr th td caption colgroup col s u figure figcaption section article header footer)
       
       def self.included(base)
@@ -51,7 +53,9 @@ module RedmineMorePreviews
           # (see ControllerHelper#preview_reload?); unsafe never does: it converts
           # without the cache and so needs a block, which the cached view has not
           def inline_preview_options
-            preview_query_parameters.except('reload', 'unsafe').symbolize_keys.merge(
+            # nor may a query key set what the converter's own settings set (timeout,
+            # shell_api, settings, ...: see Converter#worker_attributes)
+            preview_query_parameters.except('reload', 'unsafe', *RedmineMorePreviews::Patches::ApplicationHelperPatch::WORKER_KEYS).symbolize_keys.merge(
               :format  => "inline",
               :request => request,
               :reload  => params[:reload].present? && User.current.admin?

@@ -74,6 +74,28 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  def test_zip_links_keep_the_revision_and_no_other_query_key
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      rev = @repository.changesets.first.revision
+      get '/projects/ecookbook/repository/samples/preview/sample.zip@/index.html', :params => { :rev => rev, :script_name => '//evil.example' }
+      assert_response :success
+      href = css_select('a[download="hello.txt"]').first&.[]('href')
+      assert_equal "/projects/ecookbook/repository/samples/#{rev}/preview/sample.zip@/index.html?asset=inner%2Fhello.txt", href
+      assert_not_include 'evil.example', response.body
+    end
+  end
+
+  # Cliff lists an email's attachments with a link once they are stored
+  def test_asset_link_of_a_stored_asset
+    path = File.join(@repository.preview_dirname('sample.eml', nil, :format => @repository.preview_format('sample.eml', nil)), 'note.txt')
+    FileUtils.mkdir_p(File.dirname(path))
+    File.write(path, 'stored')
+    html = @repository.asset_link('sample.eml', nil, 'note.txt')
+    assert_include 'note.txt', html
+    assert_include 'text-plain', html
+  end
+
   def test_mail_entry_shows_the_headers_and_the_body
     with_converters(CONVERTERS) do
       log_user('jsmith', 'jsmith')

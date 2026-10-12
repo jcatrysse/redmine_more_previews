@@ -238,12 +238,19 @@ class Zippy < RedmineMorePreviews::Conversion
   #---------------------------------------------------------------------------------------
   # asset_link_path: the page that serves an entry of the archive
   #---------------------------------------------------------------------------------------
+  # Built from the route's parameters only: query keys such as script_name or anchor
+  # are options to the url helpers (script_name=//host made every link of the cached
+  # listing point to another host), and reload would be kept in every link. A
+  # repository revision given as a query parameter is kept.
   def asset_link_path( name )
+    link = request.path_parameters.symbolize_keys.merge(:asset => name)
     if object['type'] == :repository
+      rev = request.query_parameters['rev']
+      link[:rev] ||= rev if rev.is_a?(String) && rev.present?
       # the repository entry or preview the table is shown on
-      url_helpers.url_for(request.params.symbolize_keys.merge(:asset => name, :only_path => true))
+      url_helpers.url_for(link.merge(:only_path => true))
     else
-      url_helpers.more_preview_path(request.params.symbolize_keys.merge(:asset => name))
+      url_helpers.more_preview_path(link)
     end
   end #def
   
