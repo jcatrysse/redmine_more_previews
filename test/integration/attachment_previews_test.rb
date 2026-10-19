@@ -201,6 +201,43 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  # upstream 9e8df9d, 048837b: the module switches the direct URLs off as well
+  def test_disabled_project_module_blocks_previews_and_assets
+    attachment = preview_attachment(@issue, 'sample.zip')
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      @project.enabled_module_names = @project.enabled_module_names - ['redmine_more_previews']
+      get "/attachments/more_preview/#{attachment.id}/index.html"
+      assert_response :not_found
+      get "/attachments/more_preview/#{attachment.id}/index.html", :params => { :asset => 'top.txt' }
+      assert_response :not_found
+      get "/attachments/more_preview/#{attachment.id}/top.txt"
+      assert_response :not_found
+      assert_not_include 'top level', response.body
+
+      enable_previews(@project)
+      get "/attachments/more_preview/#{attachment.id}/index.html"
+      assert_response :success
+      assert_include 'top.txt', response.body
+      get "/attachments/more_preview/#{attachment.id}/top.txt"
+      assert_response :success
+      assert_equal "top level\n", response.body
+    end
+  end
+
+  # the module check comes after the visibility check: no 404 tells a
+  # non-member that the attachment exists
+  def test_attachment_one_cannot_see_stays_forbidden_with_the_module_off
+    private_project = Project.find(2)
+    private_project.enabled_module_names = private_project.enabled_module_names - ['redmine_more_previews']
+    attachment = preview_attachment(Issue.find(4), 'sample.zip') # issue 4 is in the private project 2
+    with_converters(CONVERTERS) do
+      log_user('dlopper', 'foo')
+      get "/attachments/more_preview/#{attachment.id}/index.html"
+      assert_response :forbidden
+    end
+  end
+
   def test_tgz_asset
     attachment = preview_attachment(@issue, 'sample.tgz')
     with_converters(CONVERTERS) do

@@ -36,6 +36,7 @@ module RedmineMorePreviews
           # prepends on them in the chain (no alias_method copies)
           before_action -> { find_attachment },            :only => [:more_preview, :more_asset]
           before_action -> { read_authorize },             :only => [:more_preview, :more_asset]
+          before_action :ensure_more_previews_module_enabled, :only => [:more_preview, :more_asset]
           before_action :find_asset_param,                 :only => [:more_preview, :more_asset]
           rescue_from   RedmineMorePreviews::Exceptions::ConverterLockTimeOut, :with => :render_more_preview_busy
           rescue_from   RedmineMorePreviews::Exceptions::ConverterTooLarge,    :with => :render_more_preview_too_large
@@ -92,6 +93,14 @@ module RedmineMorePreviews
           # private
           #
           ################################################################################
+          # the project's module switches the previews off for the direct URLs as
+          # well, not only for the attachment page (upstream 9e8df9d); after
+          # read_authorize, so that an attachment one cannot see stays a 403
+          def ensure_more_previews_module_enabled
+            render_404 unless @attachment.project&.module_enabled?('redmine_more_previews')
+          end #def
+          private :ensure_more_previews_module_enabled
+          
           def send_more_preview
             sandbox_preview Rack::Mime.mime_type(".#{params[:format]}")
             if !preview_unsafe? && RedmineMorePreviews::Converter.cache_previews?

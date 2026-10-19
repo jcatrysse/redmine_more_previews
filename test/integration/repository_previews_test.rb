@@ -156,6 +156,27 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  # upstream 3b1b73a, d15b781: "Browse repository" does not override the module
+  def test_disabled_project_module_blocks_preview_and_asset
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      @project.enabled_module_names = @project.enabled_module_names - ['redmine_more_previews']
+      get '/projects/ecookbook/repository/samples/preview/docs/sample.txt@/index.txt'
+      assert_response :not_found
+      get '/projects/ecookbook/repository/samples/preview/sample.zip@inner/hello.txt'
+      assert_response :not_found
+      assert_not_include 'hello inner', response.body
+
+      enable_previews(@project)
+      get '/projects/ecookbook/repository/samples/preview/docs/sample.txt@/index.txt'
+      assert_response :success
+      assert_include 'Plain text sample', response.body
+      get '/projects/ecookbook/repository/samples/preview/sample.zip@inner/hello.txt'
+      assert_response :success
+      assert_equal "hello inner\n", response.body
+    end
+  end
+
   def test_more_preview_is_allowed_with_browse_repository_alone
     # entry needs browse_repository; its preview frame must not need more
     Role.find(1).remove_permission!(:view_changesets)

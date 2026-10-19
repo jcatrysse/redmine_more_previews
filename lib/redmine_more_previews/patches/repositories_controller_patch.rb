@@ -32,6 +32,7 @@ module RedmineMorePreviews
             
           # a lambda, see AttachmentsControllerPatch
           before_action -> { find_project_repository },    :only => [:more_asset, :more_preview ]
+          before_action :ensure_more_previews_module_enabled,      :only => [:more_asset, :more_preview ]
           before_action :find_path_param,                          :only => [:more_asset, :more_preview ]
           rescue_from   RedmineMorePreviews::Exceptions::ConverterLockTimeOut, :with => :render_more_preview_busy
           rescue_from   RedmineMorePreviews::Exceptions::ConverterTooLarge,    :with => :render_more_preview_too_large
@@ -88,6 +89,13 @@ module RedmineMorePreviews
           # private
           #
           ################################################################################
+          # "Browse repository" alone does not override a project that switched the
+          # previews off: the direct URLs are refused as well (upstream 3b1b73a)
+          def ensure_more_previews_module_enabled
+            render_404 unless @repository.project.module_enabled?('redmine_more_previews')
+          end #def
+          private :ensure_more_previews_module_enabled
+
           def send_more_preview
             sandbox_preview Rack::Mime.mime_type(".#{params[:format]}")
             if !preview_unsafe? && RedmineMorePreviews::Converter.cache_previews?
