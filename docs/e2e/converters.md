@@ -1,6 +1,6 @@
 # converters
 
-Run 2026-10-12T08:02:49.872Z against http://127.0.0.1:3000.
+Run 2026-10-19T06:22:50.197Z against http://127.0.0.1:3000.
 
 | screenshot | user | URL | shows |
 |---|---|---|---|
@@ -21,4 +21,4 @@ Run 2026-10-12T08:02:49.872Z against http://127.0.0.1:3000.
 | ![](converters-sample-tgz.png) | manager | `/attachments/12` | Zippy: tgz content table |
 | ![](converters-navigation-next.png) | manager | `/attachments/7/sample.odt` | "Next »" leads from sample.md to the next attachment of the issue (sample.odt) |
 | ![](converters-reload.png) | admin | `/attachments/7?reload=1` | As administrator, the "Update" link (SVG reload icon) reconverts the file |
-| ![](converters-issue-attachments.png) | manager | `/issues/7` | The issue with its sample attachments; the plugin adds file-type icons through a CSS hook |
+| ![](converters-issue-attachments.png) | manager | `/issues/7` | The issue with its sample attachments, with Redmine's own SVG file icons (the plugin's raster icon CSS is gone since round 6, upstream 0baa6a7) |

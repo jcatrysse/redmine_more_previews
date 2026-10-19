@@ -165,6 +165,78 @@ viewer.status = User::STATUS_ACTIVE
 viewer.save!(validate: false)
 Member.create!(principal: viewer, project: project, roles: [changesets_role]) unless Member.where(user_id: viewer.id, project_id: project.id).exists?
 
+# round 6 (curecodejp 6.1.3): an ODT that links a file of the server as its image (Libre's
+# sandbox must not embed it), a vCard with IMPP and a photo, a file whose copy on disk the
+# scenario removes, a markdown file named with a leading dash; and a second repository with
+# an email (with an attachment) at its top, deleted by test/e2e/repository_delete.mjs
+require 'base64'
+round6_dir = Rails.root.join('tmp', 'e2e-round6').to_s
+FileUtils.mkdir_p(round6_dir)
+secret_png = File.join(round6_dir, 'server-secret.png')
+unless File.exist?(secret_png)
+  require 'zlib'
+  chunk = ->(kind, body) { [body.bytesize].pack('N') + kind + body + [Zlib.crc32(kind + body)].pack('N') }
+  rows = 4.times.map { |y| "\x00".b + 4.times.map { |x| [20 + x * 60, 25 + y * 55, 50 + (x + y * 4) * 12].pack('C3') }.join }.join
+  File.binwrite(secret_png, "\x89PNG\r\n\x1a\n".b + chunk.call('IHDR', [4, 4, 8, 2, 0, 0, 0].pack('NNC5')) +
+                            chunk.call('IDAT', Zlib::Deflate.deflate(rows)) + chunk.call('IEND', ''.b))
+end
+round6 = {
+  'external-image.odt' => lambda do |path|
+    ns = 'xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" ' \
+         'xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" ' \
+         'xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" ' \
+         'xmlns:svg="urn:oasis:names:tc:opendocument:xmlns:svg-compatible:1.0" xmlns:xlink="http://www.w3.org/1999/xlink"'
+    content = %(<?xml version="1.0" encoding="UTF-8"?><office:document-content #{ns} office:version="1.2">) +
+              '<office:body><office:text><text:p>E2E-SANDBOX: the image below is a file of the server</text:p>' \
+              '<text:p><draw:frame draw:name="ServerFile" text:anchor-type="as-char" svg:width="3cm" svg:height="3cm">' +
+              %(<draw:image xlink:href="file://#{secret_png}" xlink:type="simple" xlink:show="embed" xlink:actuate="onLoad"/>) +
+              '</draw:frame></text:p></office:text></office:body></office:document-content>'
+    manifest = '<?xml version="1.0" encoding="UTF-8"?><manifest:manifest ' \
+               'xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0" manifest:version="1.2">' \
+               '<manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text"/>' \
+               '<manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>'
+    Zip::File.open(path, create: true) do |zip|
+      zip.get_output_stream('mimetype') { |io| io.write('application/vnd.oasis.opendocument.text') }
+      zip.get_output_stream('content.xml') { |io| io.write(content) }
+      zip.get_output_stream('META-INF/manifest.xml') { |io| io.write(manifest) }
+    end
+  end,
+  'impp.vcf' => lambda do |path|
+    png = Base64.strict_encode64(File.binread(secret_png))
+    File.write(path, ['BEGIN:VCARD', 'VERSION:4.0', 'FN:Ivy Impp', 'N:Impp;Ivy;;;', 'IMPP:xmpp:ivy@example.net',
+                      "PHOTO:data:image/png;base64,#{png}", 'END:VCARD', ''].join("\r\n"))
+  end,
+  'gone.txt' => ->(path) { File.write(path, "removed from disk by test/e2e/missing_file.mjs\n") },
+  '-draft.md' => ->(path) { File.write(path, "# Draft\n\nA file name that starts with a dash.\n") }
+}
+round6_issue = e2e_preview_issue(project, 'E2E round 6', admin)
+round6.each do |name, make|
+  path = File.join(round6_dir, name)
+  make.call(path) unless File.exist?(path)
+  e2e_attach(round6_issue, path, admin)
+end
+repo6_dir = Rails.root.join('tmp', 'e2e-repo6').to_s
+unless File.directory?(File.join(repo6_dir, '.git'))
+  FileUtils.mkdir_p(repo6_dir)
+  File.write(File.join(repo6_dir, 'with-attachment.eml'), [
+    'From: Alice <alice@example.net>', 'To: Bob <bob@example.net>', 'Subject: E2E email with an attachment',
+    'MIME-Version: 1.0', 'Content-Type: multipart/mixed; boundary="att"', '',
+    '--att', 'Content-Type: text/plain; charset=UTF-8', '', 'The note is attached.', '',
+    '--att', 'Content-Type: text/plain; name="note.txt"', 'Content-Disposition: attachment; filename="note.txt"', '',
+    'E2E-NOTE: the attachment of the email', '--att--', ''
+  ].join("\r\n"))
+  FileUtils.cp(File.join(files, 'sample.md'), repo6_dir)
+  system('git', '-C', repo6_dir, 'init', '-q', '-b', 'main', exception: true)
+  system('git', '-C', repo6_dir, 'add', '.', exception: true)
+  system('git', '-C', repo6_dir, '-c', 'user.name=E2E', '-c', 'user.email=e2e@example.net',
+         'commit', '-q', '-m', 'An email for the previews', exception: true)
+end
+repository6 = project.repositories.find_by(identifier: 'round6') ||
+              Repository::Git.new(project: project, identifier: 'round6', is_default: false)
+repository6.url = repository6.root_url = File.join(repo6_dir, '.git')
+repository6.save!
+repository6.fetch_changesets
+
 # for scenarios that upload through the REST API
 File.write(Rails.root.join('tmp', 'e2e-manager-api-key'), User.find_by!(login: 'manager').api_key)
 

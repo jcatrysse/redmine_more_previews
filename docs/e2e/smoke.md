@@ -1,6 +1,6 @@
 # smoke
 
-Run 2026-10-12T08:01:37.433Z against http://127.0.0.1:3000.
+Run 2026-10-19T06:04:19.276Z against http://127.0.0.1:3000.
 
 | screenshot | user | URL | shows |
 |---|---|---|---|
@@ -18,4 +18,5 @@ Run 2026-10-12T08:01:37.433Z against http://127.0.0.1:3000.
 | ![](smoke-12.png) | admin | `/attachments/1/1` | /attachments/1/1 (HTTP 404) |
 | ![](smoke-13.png) | admin | `/attachments/1` | /attachments/1 (HTTP 200) |
 | ![](smoke-14.png) | admin | `/admin/info` | /admin/info (HTTP 200) |
-| ![](smoke-15.png) | admin | `/attachments/more_preview/1/index` | /attachments/more_preview/1/index (HTTP 404) |
+| ![](smoke-15.png) | admin | `/settings/plugin/1` | /settings/plugin/1 (HTTP 404) |
+| ![](smoke-16.png) | admin | `/attachments/more_preview/1/index` | /attachments/more_preview/1/index (HTTP 404) |

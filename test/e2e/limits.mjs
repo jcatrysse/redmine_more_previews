@@ -72,15 +72,21 @@ const mailRows = [['email', 'HTTP', 'seconds', 'preview']];
 for (const [name, reason] of [['large.eml', 'larger than 1 MiB'], ['nested.eml', 'more than 100 nested multipart parts'], ['parts.eml', 'more than 1000 parts']]) {
   const r = await get(`/attachments/more_preview/${att[name]}/index.html`);
   mailRows.push([name, r.status, r.seconds, r.body.slice(0, 80)]);
-  if (!r.body.includes(reason)) t.problems.push(`${name}: preview lacks "${reason}": ${r.body.slice(0, 200)}`);
+  // round 6 (curecodejp 6b27fe7): 413, the reason is its body
+  if (r.status !== 413) t.problems.push(`${name}: HTTP ${r.status}, expected 413`);
+  if (!r.body.includes(reason)) t.problems.push(`${name}: answer lacks "${reason}": ${r.body.slice(0, 200)}`);
   if (/\.rb:\d+|backtrace/.test(r.body)) t.problems.push(`${name}: the preview shows a backtrace`);
 }
-await table('Emails beyond Cliff\'s limits, as manager', 'Cliff refuses before Mail parses the email (size, parts) or before it walks the parts (nesting); the preview says why, without a backtrace.', mailRows);
-await t.shot('emails-refused', 'An email above the size limit, one nested 150 levels deep and one of 1,001 parts are refused with their reason', { full: false });
-await t.go(`/attachments/${att['nested.eml']}`);
+await table('Emails beyond Cliff\'s limits, as manager', 'Cliff refuses before Mail parses the email (size, parts) or before it walks the parts (nesting): HTTP 413 with the reason as its body, without a backtrace (round 6).', mailRows);
+await t.shot('emails-refused', 'An email above the size limit, one nested 150 levels deep and one of 1,001 parts are refused with 413 and their reason', { full: false });
+// the failure is remembered: a fresh one, so that the page converts and says why
+execSync(`find ${STORAGE}/failures -type f -delete`);
+await t.go(`/attachments/${att['nested.eml']}`, { allow: { requests: ['413 '] } });
 await t.page.waitForTimeout(1500);
 await t.page.mouse.move(0, 0);
-await t.shot('nested-page', 'The page of nested.eml: the preview shows why the email is not previewed', { full: false });
+const warning = (await t.page.locator('#content p.warning').textContent().catch(() => '')) || '';
+if (!warning.includes('more than 100 nested multipart parts')) t.problems.push(`nested.eml page: no warning with the reason ("${warning}")`);
+await t.shot('nested-page', 'The page of nested.eml: a warning above the empty preview frame (413) says why the email is not previewed', { full: false });
 
 // --- a converter program that hangs: stopped at the time limit, the failure remembered
 const pidFile = `${REDMINE}/tmp/e2e-hang.pid`;
