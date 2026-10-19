@@ -37,4 +37,20 @@ class AttachmentPatchTest < ActiveSupport::TestCase
     attachment.destroy
     assert_not File.exist?(path)
   end
+
+  # upstream a213a44 (#36), for attachments as well: an asset in a folder kept
+  # only its name in its link
+  def test_asset_link_of_a_stored_asset_in_a_folder
+    attachment = preview_attachment(Issue.find(1), 'sample.zip')
+    with_converters(:zippy => { :zip => :html }) do
+      path = attachment.preview_assetpath(:asset => 'inner/hello.txt')
+      FileUtils.mkdir_p(File.dirname(path))
+      File.write(path, 'stored')
+      href = Nokogiri::HTML.fragment(attachment.asset_link('inner/hello.txt')).at_css('a')['href']
+      route = Rails.application.routes.recognize_path(href)
+      assert_equal 'more_asset', route[:action]
+      assert_equal 'inner/hello', Array(route[:asset]).join('/')
+      assert_equal 'txt', route[:assetformat]
+    end
+  end
 end

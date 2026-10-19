@@ -96,6 +96,22 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
     assert_include 'text-plain', html
   end
 
+  # upstream a213a44 (#36): the link of an asset in a folder kept only its name
+  def test_asset_link_of_a_stored_asset_in_a_folder
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get '/projects/ecookbook/repository/samples/preview/sample.zip@inner/hello.txt'
+      assert_response :success
+      html = @repository.asset_link('sample.zip', nil, 'inner/hello.txt')
+      href = Nokogiri::HTML.fragment(html).at_css('a')['href']
+      assert_equal 'inner/hello', Array(Rails.application.routes.recognize_path(href)[:asset]).join('/')
+      get href
+      assert_response :success, href
+      assert_equal "hello inner\n", response.body
+      assert_equal '', @repository.asset_link('sample.zip', nil, 'inner/missing.txt')
+    end
+  end
+
   def test_mail_entry_shows_the_headers_and_the_body
     with_converters(CONVERTERS) do
       log_user('jsmith', 'jsmith')

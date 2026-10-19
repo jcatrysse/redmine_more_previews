@@ -92,7 +92,8 @@ module RedmineMorePreviews
           def asset_link( asset )
           
             extname  = File.extname( asset )
-            basename = File.basename( asset, extname )
+            # with its folders, as Repository#asset_link (upstream a213a44)
+            basename = asset.delete_suffix( extname )
             
             _link = Rails.application.routes.url_helpers.more_asset_path(
               self, basename, extname[1..-1]

@@ -128,7 +128,9 @@ module RedmineMorePreviews
             dirname     = File.dirname(path)
             
             assetformat = File.extname(asset)
-            assetname   = File.basename(asset, assetformat)
+            # the folders of the asset stay in its link: the controller finds the
+            # stored asset by them (upstream a213a44)
+            assetname   = asset.delete_suffix(assetformat)
             
             _link = Rails.application.routes.url_helpers.url_for(
               :controller    => "repositories",
@@ -136,7 +138,8 @@ module RedmineMorePreviews
               :id            => project.identifier,
               :repository_id => identifier_param,
               :rev           => rev,
-              :path          => [dirname, basename].join("/"),
+              # a file at the top of the repository has no folder, not "."
+              :path          => dirname == "." ? basename : [dirname, basename].join("/"),
               :baseformat    => extname[1..-1],
               :asset         => assetname,
               :assetformat   => assetformat[1..-1], 
