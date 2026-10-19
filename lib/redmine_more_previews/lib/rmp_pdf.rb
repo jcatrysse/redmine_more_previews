@@ -27,42 +27,28 @@ module RedmineMorePreviews
         # Returns a PDF string for a converter
         def more_prewiew_to_pdf(locals={})
           pdf = Redmine::Export::PDF::ITCPDF.new(::I18n.locale)
-          pdf.set_title("Hello World!")
+          pdf.set_title("Converter diagnostics")
           pdf.alias_nb_pages
           options = {}
           options[:format] = ::Setting.date_format unless ::Setting.date_format.blank?
-          pdf.footer_date = ::I18n.l(User.current.today.to_date, options)
+          pdf.footer_date = ::I18n.l(User.current.today.to_date, **options)
           pdf.add_page
           
           pdf.SetFontStyle('B',11)
-          buf = "Hello World!"
+          buf = "Converter diagnostics"
           pdf.RDMMultiCell(190, 5, buf)
           
           pdf.SetFontStyle('',8)
-          buf  = "You were trying to preview the following object: "
-          buf += "#{locals.dig(:@object,'object').try(:class).try(:name)} - #{locals.dig(:@object,'object').try(:id)}"
-          pdf.RDMMultiCell(190, 5, buf)
-          
-          buf  = "The following parameters were available for conversion of the object:"
-          pdf.RDMMultiCell(190, 5, buf)
-          
-          imgfile = "emoji#{rand(1..5)}.png"
-          imgpath = File.join(__dir__, "conversion", imgfile)
-          atta = Attachment.create(
-            :file           =>File.open(imgpath),
-            :filename       =>imgfile, 
-            :author         =>User.current
-          )
-          buf  = "<p>random image <img src='#{imgfile}'></p>"
-          pdf.RDMwriteFormattedCell(190,5,'','', buf, [atta], 0)
+          # the caller passes public metadata only (Conversion#debug_fields); no
+          # other field is printed, whoever calls (upstream 3fd686e, 47c98ec)
+          pdf.RDMMultiCell(190, 5, "Converter diagnostic fields (internal details omitted):")
           
           locals.each do |key, value|
+            next unless RedmineMorePreviews::Conversion::SAFE_DEBUG_FIELDS.include?(key.to_s)
             buf = "#{key}: #{value}"
             pdf.RDMMultiCell(190, 5, buf)
           end
           pdf.output
-        ensure
-          atta.destroy if atta
         end #def
       end #class
     end #module

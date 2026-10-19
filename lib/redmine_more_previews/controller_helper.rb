@@ -55,6 +55,15 @@ module RedmineMorePreviews
     end #def
     private :preview_params
 
+    # the ETag of a stored preview: a browser that kept a preview stored before a
+    # change of the cache format (Conversion::CACHE_FORMAT_VERSION), or in the
+    # other debug mode, must not get a 304 for it (upstream 35fdcb6, 554a683)
+    def preview_etag(mtime)
+      [mtime, RedmineMorePreviews::Conversion::CACHE_FORMAT_VERSION,
+       RedmineMorePreviews::Converter.debug?]
+    end #def
+    private :preview_etag
+
     # seconds after which a client may ask again for a preview that was busy
     BUSY_RETRY_AFTER = 10
 

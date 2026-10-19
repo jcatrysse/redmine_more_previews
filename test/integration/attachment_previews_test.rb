@@ -238,6 +238,27 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  # upstream 35fdcb6, 554a683: a browser that kept the ETag of the preview in the
+  # other debug mode (or of one stored before the cache format changed) gets the
+  # preview again, not a 304 for what it holds
+  def test_etag_of_the_other_debug_mode_is_not_answered_with_304
+    attachment = preview_attachment(@issue, 'sample.txt')
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      # the first request converts: its ETag carries the time before the conversion
+      2.times { get "/attachments/more_preview/#{attachment.id}/index.txt" }
+      assert_response :success
+      etag = response.headers['ETag']
+      get "/attachments/more_preview/#{attachment.id}/index.txt", :headers => { 'If-None-Match' => etag }
+      assert_response :not_modified
+      Setting.plugin_redmine_more_previews = Setting.plugin_redmine_more_previews.merge('debug' => '1')
+      get "/attachments/more_preview/#{attachment.id}/index.txt", :headers => { 'If-None-Match' => etag }
+      assert_response :success
+      assert_include 'Converter debug information', response.body
+      assert_not_include @project.identifier, response.body
+    end
+  end
+
   def test_tgz_asset
     attachment = preview_attachment(@issue, 'sample.tgz')
     with_converters(CONVERTERS) do
