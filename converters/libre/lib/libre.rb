@@ -25,6 +25,7 @@ class Libre < RedmineMorePreviews::Conversion
   # constants
   #---------------------------------------------------------------------------------
   LIBRE_OFFICE_BIN = 'soffice'.freeze
+  ALLOWED_OUTPUT_FORMATS = %w(html txt pdf png jpg).freeze
   
   #---------------------------------------------------------------------------------
   # check: is LibreOffice available?
@@ -44,10 +45,17 @@ class Libre < RedmineMorePreviews::Conversion
   end #def
   
   def soffice( src, user_installation )
+    # the format comes from the plugin settings, which an administrator edits:
+    # checked before it goes into the shell command, and quoted
+    output_format = preview_format.to_s
+    unless ALLOWED_OUTPUT_FORMATS.include?(output_format)
+      raise ConverterBadArgument, 'Unsupported LibreOffice output format'
+    end
+    quoted_format = shell_quote(output_format)
     if Redmine::Platform.mswin?
-    "#{LIBRE_OFFICE_BIN} --headless --convert-to #{preview_format} --outdir #{shell_quote tmpdir} #{shell_quote src}"
+    "#{LIBRE_OFFICE_BIN} --headless --convert-to #{quoted_format} --outdir #{shell_quote tmpdir} #{shell_quote src}"
     else
-    "#{LIBRE_OFFICE_BIN} --headless --convert-to #{preview_format} --outdir #{shell_quote tmpdir} -env:UserInstallation=file://#{user_installation} #{shell_quote src}"
+    "#{LIBRE_OFFICE_BIN} --headless --convert-to #{quoted_format} --outdir #{shell_quote tmpdir} -env:UserInstallation=file://#{user_installation} #{shell_quote src}"
     end
   end #def
   
