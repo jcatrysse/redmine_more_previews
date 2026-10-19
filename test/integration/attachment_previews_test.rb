@@ -643,6 +643,10 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
   # its file icons as SVG and has no background rules for .icon any more, so the
   # plugin's icon tiled over the names (repository browser, Cliff's attachment links)
   def test_pages_carry_no_raster_file_icon_css
+    # with redmine_view_issue_description an issue needs its permission (GEOxyz set)
+    if Redmine::Plugin.installed?(:redmine_view_issue_description)
+      Role.find(1).add_permission!(:view_issue_description)
+    end
     with_converters(:libre => { :docx => :pdf, :xlsx => :html }) do
       log_user('jsmith', 'jsmith')
       get "/issues/#{@issue.id}"
