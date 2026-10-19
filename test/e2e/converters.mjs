@@ -80,7 +80,7 @@ await t.login('manager');
 await t.go(`/issues/${issue.id}`);
 const iconCss = await t.page.evaluate(() => document.head.innerHTML.includes('.icon-file.'));
 if (!iconCss) t.problems.push('icon css hook missing');
-await t.shot('issue-attachments', 'The issue with its sample attachments; the plugin adds file-type icons through a CSS hook');
+await t.shot('issue-attachments', 'The issue with its sample attachments, with Redmine's own SVG file icons (the plugin's raster icon CSS is gone since round 6, upstream 0baa6a7)');
 await t.done();
 
 // lookups through the manager's API key (test/e2e/seed.rb): a plugin may restrict issue data for a session

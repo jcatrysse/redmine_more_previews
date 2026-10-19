@@ -620,6 +620,18 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  # upstream 0baa6a7: no raster icons behind .icon-file on Redmine 7. Core draws
+  # its file icons as SVG and has no background rules for .icon any more, so the
+  # plugin's icon tiled over the names (repository browser, Cliff's attachment links)
+  def test_pages_carry_no_raster_file_icon_css
+    with_converters(:libre => { :docx => :pdf, :xlsx => :html }) do
+      log_user('jsmith', 'jsmith')
+      get "/issues/#{@issue.id}"
+      assert_response :success
+      assert_no_match(/\.icon-file\.[^{]*\{\s*background-image/, response.body)
+    end
+  end
+
   def test_admin_info_lists_the_converter_checks
     with_converters(CONVERTERS) do
       log_user('admin', 'admin')

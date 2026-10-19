@@ -41,7 +41,6 @@ end
 require_relative "redmine_more_previews/constants"
 require_relative "redmine_more_previews/exceptions"
 require_relative "redmine_more_previews/modules"
-require_relative "redmine_more_previews/hooks"
 require_relative "redmine_more_previews/lib"
 
 require_relative "redmine_more_previews/controller_helper"
