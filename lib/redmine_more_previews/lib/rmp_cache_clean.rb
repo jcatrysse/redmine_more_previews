@@ -28,7 +28,8 @@ module RedmineMorePreviews
     # and skipped while a request holds the lock: it is removed on the next run.
     # The lock files stay, as a request may be waiting on one; the list of its
     # assets goes with it (see RmpAssetList). Failures remembered longer than
-    # Converter.failure_ttl are removed as well.
+    # Converter.failure_ttl are removed as well, and the previews of deleted
+    # repositories that a conversion kept.
     module RmpCacheClean
       
       # the number of previews removed
@@ -44,15 +45,26 @@ module RedmineMorePreviews
           next if inside_preview?( dir, dirs )
           next unless old?( marker, cutoff )
           next unless RmpFile.within_directory?( storage, dir )
-          File.open( "#{dir}.lock", File::RDWR | File::CREAT, 0644 ) do |lock|
-            next unless lock.flock( File::LOCK_EX | File::LOCK_NB )
-            # the preview may have been converted again meanwhile
-            next unless old?( marker, cutoff )
-            FileUtils.rm_rf( dir )
-            FileUtils.rm_f( marker )
-            RmpAssetList.remove( dir )
-            removed += 1
+          begin
+            File.open( "#{dir}.lock", File::RDWR | File::CREAT, 0644 ) do |lock|
+              next unless lock.flock( File::LOCK_EX | File::LOCK_NB )
+              # the preview may have been converted again meanwhile
+              next unless old?( marker, cutoff )
+              FileUtils.rm_rf( dir )
+              FileUtils.rm_f( marker )
+              RmpAssetList.remove( dir )
+              removed += 1
+            end
+          rescue Errno::ENOENT
+            # removed meanwhile with its repository or attachment (upstream 504c42f)
+            next
           end
+        end
+        # the previews of a deleted repository whose removal found a conversion
+        # running (see RepositoryPatch.cleanup_removed_repository_cache)
+        Dir.glob( File.join( storage, "repository", "*", "*.cleanup_pending" ) ).each do |pending|
+          RedmineMorePreviews::Patches::RepositoryPatch.cleanup_removed_repository_cache(
+            File.dirname( pending ), File.basename( pending ).delete_suffix( ".cleanup_pending" ) )
         end
         remove_failures
         removed

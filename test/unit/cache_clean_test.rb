@@ -68,6 +68,37 @@ class CacheCleanTest < ActiveSupport::TestCase
     assert_not File.exist?(File.join(recent, 'evil.lock'))
   end
 
+  # upstream 504c42f: a preview removed meanwhile with its repository does not
+  # stop the others from being removed
+  def test_disappeared_repository_marker_does_not_abort_other_cleanup
+    vanished = preview('repository/gits/3/abc/a/old/preview.html', 31)
+    other = preview('attachments/5/preview.html', 31)
+    original = File.method(:open)
+    begin
+      File.define_singleton_method(:open) do |path, *args, **kwargs, &block|
+        raise Errno::ENOENT, path if path.to_s == "#{vanished}.lock"
+        original.call(path, *args, **kwargs, &block)
+      end
+      assert_equal 1, RmpCacheClean.run(30)
+    ensure
+      File.define_singleton_method(:open, original)
+    end
+    assert_not File.exist?(other)
+    assert File.exist?(vanished)
+  end
+
+  # upstream 504c42f: the previews of a deleted repository that a conversion kept
+  def test_deferred_repository_cleanup_is_retried_by_cache_clean
+    orphan = File.join(@storage, 'repository', 'gits', '99999999')
+    FileUtils.mkdir_p(orphan)
+    File.write(File.join(orphan, 'private.txt'), 'previously cached content')
+    File.write("#{orphan}.cleanup_pending", 'pending')
+
+    assert_equal 0, RmpCacheClean.run(30)
+    assert_not File.exist?(orphan)
+    assert_not File.exist?("#{orphan}.cleanup_pending")
+  end
+
   def test_old_failures_are_removed
     failures = File.join(@storage, 'failures')
     FileUtils.mkdir_p(failures)
