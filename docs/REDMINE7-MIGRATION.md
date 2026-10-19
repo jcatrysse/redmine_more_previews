@@ -20,7 +20,7 @@ what is left. Written 2026-10-06 from a measured analysis (report at the bottom)
 | Upstream | HugoHasenbein/redmine_more_previews main @ 0bca937b36c56e3114e582b9bdf3384814d394ca (2025-02-13, 5.0.9) |
 | Runs on Redmine 7 as is | NEE (boot) |
 | Runs on Redmine 7 after this branch | JA: tests and e2e green on PostgreSQL 16 (see "Results"); also with the other GEOxyz plugins, apart from their own defects listed there |
-| Migration session | done 2026-10-06; Jan's decisions of 2026-10-07, round 4 (2026-10-11) and round 5 (2026-10-12, security fixes of curecodejp 6.1.2: conversion limits, Vince) built (see "Decided by Jan") |
+| Migration session | done 2026-10-06; Jan's decisions of 2026-10-07, round 4 (2026-10-11), round 5 (2026-10-12, security fixes of curecodejp 6.1.2: conversion limits, Vince) and round 6 (2026-10-19, curecodejp 6.1.3: Libre in a bubblewrap sandbox, debug redaction, module off, Cliff 413, repository cache removal) built (see "Decided by Jan") |
 | Upstream sync | UPSTREAM DOOD: nothing upstream; fork already equals upstream 5.0.9 + 2 own commits; claude/redmine7-rails8-compat 4eb8dea cherry-picked |
 | After sync | n.v.t. |
 | Complexity (1 trivial .. 5 rewrite) | 3 |
@@ -128,6 +128,8 @@ These GEOxyz commits are on the branch GEOxyz runs today and therefore on this b
 | same, with the 37 other GEOxyz plugins (heads of 2026-10-11) | PostgreSQL 16.15 | 62 runs, 466 assertions, 0 failures, 0 errors, 0 skips |
 | 7.0-stable-GEOxyz, after round 5 (`f17dffa`) | PostgreSQL 16.15 | 252 runs, 1457 assertions, 0 failures, 0 errors, 0 skips |
 | same, with the 37 other GEOxyz plugins (heads of 2026-10-12) | PostgreSQL 16.15 | 252 runs, 1457 assertions, 0 failures, 0 errors, 0 skips |
+| 7.0-stable-GEOxyz (7.0.2), before round 6 (`8202ac6`, no Ghostscript then) | PostgreSQL 16 | 252 runs, 1452 assertions, 0 failures, 0 errors, 2 skips |
+| 7.0-stable-GEOxyz (7.0.2), after round 6 (`fe0ca79`), `RMP_LIBRE_REQUIRE_SANDBOX=1` (the real sandbox tests ran) | PostgreSQL 16 | 331 runs, 2095 assertions, 0 failures, 0 errors, 0 skips |
 | (former, 5.1 no longer required) 5.1-stable, Ruby 3.2.6, at `c19f76f` | PostgreSQL 16 | 46 runs, 361 assertions, 0 failures, 0 errors, 0 skips |
 
 Boot and production eager load: OK (the e2e server runs in production mode). Migrations: the plugin
@@ -142,6 +144,7 @@ has none.
 | MariaDB + 3 other GEOxyz plugins (not committed) | 15 | 6 | 8 scripts, 46 screenshots | 0 |
 | PostgreSQL 16 after Jan's decisions (`docs/e2e/`, replaces the run above) | 15 | 6 | 9 scripts, 62 screenshots | 0 |
 | PostgreSQL 16 after round 5 (`docs/e2e/`, current) | 15 | 6 | 13 scripts, 89 screenshots (helpdesk_mail checks nothing without the helpdesk) | 0 |
+| PostgreSQL 16 after round 6 (`docs/e2e/`, current; the scenarios touched by the review fixes run again on the final code) | 16 | 6 | 21 scripts, 135 screenshots | 0 |
 | PostgreSQL 16 with all 37 other GEOxyz plugins, round 5 (`docs/e2e/combined/`, current) | 16 | 6 | 13 scripts, 93 screenshots | 1, not from this plugin (redmine_view_issue_description's 403) |
 | PostgreSQL 16 after round 4 | 15 | 6 | 11 scripts, 77 screenshots | 0 |
 | PostgreSQL 16 with all 37 other GEOxyz plugins, round 4 | 16 | 6 | 11 scripts, 77 screenshots | 1, not from this plugin (redmine_view_issue_description's 403) |
@@ -195,7 +198,7 @@ migration sessions; this plugin's scenarios pass there):
 | Maggie refuses a disguised PDF, converts real PDF and PNG (round 4) | attachment preview with Maggie on | maggie | maggie-*.png |
 | Hand-over of pdf, images, txt, md, textile, html to Redmine (rake task, Jan q3) | `rake redmine_more_previews:use_core_previews` once after the upgrade | core_handover | core_handover-*.png |
 | Converter checks on Administration > Information | Administration > Information | admin_info | admin_info-info |
-| File type icons in attachment lists (CSS hook) | any attachment list | converters | converters-issue-attachments |
+| File type icons: Redmine's own SVG icons since round 6 (the plugin's raster icon CSS hook is removed, `20fbc79`) | any attachment list, repository browser | converters | converters-issue-attachments |
 | Refusals: non-member on private project, anonymous, non-admin on settings and info | URL | permissions, settings, admin_info | *-refused, *-anonymous, permissions-outsider-page |
 | Failure paths: traversal, no converter, unknown id, no format | URL | security (+ integration tests) | security-traversal-404 |
 | Conversion limits on the settings page (round 5; Cliff and Zippy limits in their own boxes) | Administration > Plugins > Configure | limits | limits-settings |
@@ -205,6 +208,14 @@ migration sessions; this plugin's scenarios pass there):
 | Cache clean rake task `redmine_more_previews:cache:clean DAYS=30` | cron, see "After the upgrade" | limits | limits-cache-clean |
 | Hostile vCard: name as text, no javascript: links, no GEO map link from an injected value, no file: photo | attachment | limits | limits-hostile-vcard |
 | Hostile customer email as message.eml on a helpdesk ticket (combined run with redmine_contacts_helpdesk) | helpdesk ticket attachment | helpdesk_mail | combined/helpdesk_mail-*.png |
+| Libre in its bubblewrap sandbox: docx/odt to pdf/html, a linked server file not embedded, the check on Administration > Information; without a usable bwrap nothing converted (round 6) | attachment preview, admin info | libre_sandbox | libre_sandbox-*.png |
+| A Libre format the file type does not offer refused when saving the settings, translated (round 6) | Administration > Plugins > Configure | libre_formats | libre_formats-*.png |
+| Module off: the direct preview and asset URLs answer 404 (round 6) | URL | module_off | module_off-*.png |
+| Debug previews show converter metadata only; no 304 for an ETag of the other mode (round 6) | settings "debug", attachment | debug_redaction | debug_redaction-*.png |
+| Repository deleted: its previews removed; an email's attachment link at the top of a repository works (round 6) | Project settings > Repositories > Delete; repository entry | repository_delete | repository_delete-*.png |
+| Vince IMPP label and photo alt text, Cliff labels on one line (German), "-draft.md", an attachment missing on disk answered 404 (round 6) | attachment | round6_files | round6_files-*.png |
+| Emails beyond Cliff's limits: 413 with the reason, a warning on the page (round 6) | attachment | limits | limits-emails-refused, limits-nested-page |
+| Purge of all stored previews `cache:clean DAYS=0 CONFIRM_PURGE_ALL=1` (round 6) | rake, once after the upgrade | cache_purge | cache_purge-rake |
 | REST API, mail in/out | the plugin has none | - | - |
 
 ### Reviews
@@ -218,6 +229,16 @@ migration sessions; this plugin's scenarios pass there):
   fixed or mitigated with tests in `a2b9cc3`, `35fc297`, `f17dffa`; the rest recorded with reasons under "Round 5"
   above) and OpenAI review (gpt-5) `docs/reviews/openai-2026-10-12-d78c880.md` (4 findings: 1 fixed,
   3 not defects, with reasons).
+
+- Round 6 (2026-10-19): own review by an independent reviewer (read-only) of `8202ac6..HEAD`: no
+  high finding; fixed with tests: the refusal reason remembered and translated per viewer
+  (`fe0ca79`), the sandbox probe through RmpProcess and soffice required inside the mounted paths
+  (`8387678`), malformed settings refused instead of 500 (`c68d92d`), a stronger symlink test.
+  Recorded, not changed: inside the sandbox `/proc` is mounted, so a document can show host *paths*
+  (`/proc/self/mountinfo`), no file content (upstream mounts it the same way, LibreOffice needs it);
+  an attachment without a project (an unattached upload, or another plugin's container) gets no
+  plugin preview (the module check needs a project; core previews it as before); the sandbox probe
+  runs for each conversion and status check (one bwrap start, milliseconds).
 
 ### Not tested here (needs production or is out of reach)
 
@@ -344,10 +365,143 @@ this plugin in the interface: redmine_contacts_helpdesk opens a ticket's `messag
 the unsafe preview; what is left (Vince photos by URL, images linked from Office documents) is too
 small a risk to change.
 
-Behaviour to know: an email beyond Cliff's limits is not answered with 413 as the decision text
-says, but with its preview stating the reason (upstream's design; the e2e checks the text). A
+Behaviour to know: an email beyond Cliff's limits is answered with 413 since round 6 (`352b3ba`),
+its reason in the body and above the preview frame (before round 6: a 200 preview stating the
+reason). A
 refused or failed preview inside the `<object>` frame (embedding 0) shows an empty frame: browsers
 render no error body there (as for 404 and 503 before).
+
+**Round 6, 2026-10-19: curecodejp/redmine_more_previews v6.1.3** (security release, tag v6.1.3,
+`9c725be`). Jan, 2026-10-19 (coordinator session, multiple choice): "everything, with the sandbox":
+all security fixes and the useful small fixes, and the LibreOffice bubblewrap sandbox exactly as
+upstream (Linux only, no fallback to an unsandboxed LibreOffice; without a working sandbox Libre
+refuses). Jan accepted that Libre stays off on his server until the sandbox works there. Ported by
+hand in upstream's order, the upstream commits named in each commit, upstream's tests ported where
+they fit; every fix has a test that fails without it (checked by putting the file back as it was).
+
+| commit here | what | tests (each fails without its change) |
+|---|---|---|
+| `3eef765` | Vince: IMPP labelled in all shipped locales | vince_uri_link_test |
+| `4d67718` | Mark: `./` output path (a name starting with `-`), base URL HTML-escaped | mark_command_test |
+| `34e2c6a` | Libre: only html, txt, pdf, png, jpg; checked before the shell, quoted | libre_command_test |
+| `50bb633` | settings: a Libre format the extension does not offer is refused, nothing saved, translated error | plugin_settings_libre_formats_test |
+| `96f6b64` | project module off: the direct preview and asset URLs answer 404 (attachments and repositories) | attachment/repository_previews_test |
+| `29412b2` | debug previews show 5 metadata fields only; cache marker `<converter>:<version>:<debug/normal>`; ETag carries version and debug mode; PDF debug no longer raised on Ruby 3 | conversion_debug_redaction_test, attachment_previews_test |
+| `290feef` | attachment file missing on disk: 404 for every preview URL (was 500) | attachment_previews_test |
+| `f4fef30` | asset links keep their folders; no `/./` for a file at the top of a repository | attachment_patch_test, repository_previews_test |
+| `352b3ba` | Cliff's limits answered with 413; reason as body and as a warning on the page | rmp_process_test, cliff_limits_test, attachment/repository_previews_test |
+| `c78be95` | a deleted repository's previews removed (after commit; lifecycle lock; pending removal retried by the cache clean) | repository_preview_destroy_test, cache_clean_test |
+| `c037bcc` | Cliff's header labels on one line | attachment_previews_test |
+| `129a700` | unused shell quoting removed (no behaviour) | - |
+| `7756cb6` | Vince PHOTO/LOGO alt text | vince_uri_image_test |
+| `3ae2ab9` | **Libre in a bubblewrap sandbox**, output validated, symlinked cache entries not served, cache identity `libre-sandbox-v1`, `cache:clean DAYS=0 CONFIRM_PURGE_ALL=1` | libre_command_test, libre_sandbox_integration_test (real sandbox), cache_clean_test, attachment_previews_test |
+| `6444bed` | NilText warning and README | locales_test |
+| `20fbc79` | the raster file icon CSS removed (upstream 0baa6a7, before 6.1.2): on Redmine 7 it tiled over file names in the repository browser and in Cliff's attachment links | attachment_previews_test |
+
+Deviations from upstream, on purpose:
+- Cliff's limits (#38): upstream answers 413 and writes the reason to the log only. Here the reason
+  (translated, made of the limits alone) is the 413's body and a warning above the preview frame,
+  because a browser shows nothing of a 413 inside the `<object>` frame (round 5 kept the reasons;
+  Jan's round-5 text asked for 413). A refusal remembered for `failure_ttl` shows the generic text.
+- Cache identity: our version string is `libre-sandbox-v1` (upstream `libre-sandbox-v2`); both
+  invalidate every preview stored before.
+- ETag: ours was the mtime alone; now mtime, cache format version and debug mode (upstream also
+  has the converter id, which ours never had).
+- `cleanup_removed_repository_cache` takes the repository class's storage root (ours keeps
+  repository previews in `repository/<class>/<id>`, upstream in `repository_previews/<id>`).
+- Libre has no `fix_image_path` (an upstream 6.0 change for non-ASCII image names in HTML output,
+  never on this branch; not part of 6.1.3).
+- Locales: every new or changed text is in all shipped locales (upstream: en and ja).
+- The settings error translation (4540b78) is part of the settings commit, so no English-only
+  string was ever on the branch.
+- Found while proving round 6, from before 6.1.2: upstream 0baa6a7 (raster icon CSS off on
+  Redmine 6+), recorded as "not needed" in round 4, was needed (`20fbc79`).
+
+Sandbox in this container (Ubuntu 24.04, kernel 6.18, bubblewrap 0.9.0, LibreOffice 24.2.7.2 from
+the distribution): **works**. Unprivileged user namespaces are allowed here (no AppArmor userns
+restriction in this kernel). Proven: docx -> pdf/html and odt -> html/pdf through the plugin;
+an ODT linking a server file as its image (`file:///.../server-secret.png`) is converted, and
+neither the PDF (pdfimages: 0 images) nor the HTML nor the files stored with it hold that file,
+while the unsandboxed control (dummy data only) embeds it; the sandbox has only `lo` as network
+interface and no host `/home` or `/etc`; a conversion as user `nobody` works; at the time limit
+every LibreOffice process of the sandbox is gone; with `/usr/bin/bwrap` not executable Libre
+answers 404, logs "LibreOffice sandbox unavailable", starts no soffice, and Administration >
+Information shows the check failed. Open for the rehearsal on Jan's server: the same as the Redmine
+service user under Ubuntu's AppArmor restriction (see "After the upgrade").
+
+Upstream commits v6.1.2..v6.1.3 (69, no merges), verdict per commit:
+
+| upstream | subject | verdict |
+|---|---|---|
+| 26de33f | Add isolated Redmine 6.1 scanner Docker environment (#19357) | not needed: OSS scanner Docker environment (#19357) |
+| 3d0e4b5 | Document scanner Docker build and test usage (#19357) | not needed: scanner docs |
+| 20e5690 | Fix OSS Scanner Docker build, exclude local secrets, and run as non-root | not needed: scanner Docker build |
+| c00e6b6 | Add scanner threat model (#19358) | not needed: scanner threat model (#19358) |
+| 6946ee9 | Add standard-runner Docker build smoke test (#19357) | not needed: scanner CI |
+| aa69c64 | Document successful Actions Docker build validation (#19357) | not needed: scanner docs |
+| 9207aea | Run scanner Docker CI when .dockerignore changes (#19357) | not needed: scanner CI |
+| cf6e9f6 | Address multi-review scanner environment feedback (#19357) | not needed: scanner |
+| a9b6514 | Address multi-review scanner environment feedback (#19357) | not needed: scanner |
+| 566b82f | Address multi-review scanner environment feedback (#19357) | not needed: scanner |
+| 4685117 | Address multi-review scanner environment feedback (#19357) | not needed: scanner |
+| ec2d94a | Address multi-review scanner environment feedback (#19357) | not needed: scanner |
+| a3bb8af | fix(vince): add IMPP labels for English and Japanese (#19165) | ported `3eef765` (all shipped locales, not only en/ja) |
+| e0f27cd | fix(vince): add IMPP labels for English and Japanese (#19165) | ported `3eef765` |
+| a4d7616 | fix(mark): handle Textile, safe base URLs and dashed names (#19165) | ported `4d67718` (Textile reader was already here, 444c4b8; ./ path and escaped base URL new) |
+| 050405a | test(mark): cover leading-dash paths and Textile reader (#19165) | ported `4d67718` (+ base URL test) |
+| e675b82 | fix(libre): validate output format before shell execution (#19165) | ported `34e2c6a` |
+| ddeeba2 | test(libre): reject invalid output format and preserve supported types (#19165) | ported `34e2c6a` |
+| f06370c | fix(settings): reject unsupported Libre formats at save time (#19165) | ported `50bb633` (prepend) |
+| 55da9ac | fix(settings): load plugin-specific save validation (#19165) | ported `50bb633` |
+| 05bbe3f | test(libre): cover shell quoting and actual newline input (#19165) | ported `34e2c6a` |
+| 638057d | test(settings): reject unsupported Libre formats without saving (#19165) | ported `50bb633` (+ unknown extension, settings page as posted) |
+| 26d8f18 | docs: replace private issue references with public test guidance | not needed: upstream test docs |
+| a3b14cd | test: remove internal issue identifier from synthetic mail fixture | not needed: upstream manual fixture |
+| c7b709f | fix(settings): enumerate ActionController::Parameters for Libre validation | ported `50bb633` |
+| ec4645b | docs: use generic non-production Redmine test environment | not needed: upstream test docs |
+| 68a4c04 | test: replace private tracker label in binary PDF fixture | not needed: upstream manual fixture |
+| 9e8df9d | fix: respect disabled preview module in attachment endpoints | ported `96f6b64` (after the visibility check) |
+| 3b1b73a | fix: respect disabled preview module in repository endpoints | ported `96f6b64` |
+| 048837b | test: verify project preview toggle blocks direct requests and permits re-enable | ported `96f6b64` (integration test) |
+| d15b781 | test: verify project preview toggle blocks direct requests and permits re-enable | ported `96f6b64` |
+| d704e5d | fix: restrict debug previews to safe converter metadata | ported `29412b2` |
+| ff95933 | test: cover redacted debug output and shared preview cache | ported `29412b2` |
+| 35fdcb6 | fix: invalidate old debug caches and conditional preview ETags | ported `29412b2` (our ETag: mtime + version + debug mode) |
+| 554a683 | fix: invalidate old debug caches and conditional preview ETags | ported `29412b2` |
+| 9b296d0 | test: ensure legacy debug caches and ETags cannot serve stale secrets | ported `29412b2` |
+| 942d5c6 | test: keep legacy-cache invalidation fixtures under configured storage | ported `29412b2` |
+| 44e39ce | test: account for ERB newline after PDF diagnostic output | ported `29412b2` |
+| 4d9eb65 | test: update Zippy cache fixtures to new safe cache marker | ported `29412b2` |
+| 3fd686e | fix: remove unreachable PDF debug image and limit renderer fields | ported `29412b2` |
+| 47c98ec | refactor: share safe debug field allowlist across renderers | ported `29412b2` |
+| 20509c2 | docs: warn operators to clear legacy debug cache on upgrade | read: operator guidance carried into "After the upgrade" (purge the cache once) |
+| 388fd75 | test: verify PDF renderer filters unexpected private diagnostic fields | ported `29412b2` |
+| 399486c | test: clear plugin setting cache when switching preview formats | test fix applied where we switch formats in one test (`3ae2ab9`) |
+| 14e315a | fix(libre): quote full user-installation shell argument | superseded by the sandbox (`3ae2ab9`): the profile is file:///profile/user_installation inside it |
+| f29a2fe | test: validate full Libre profile argument under spaces and shell metacharacters | superseded, its test is in libre_command_test |
+| dc9be1c | test: exercise unescaped shell metacharacters in Libre profile paths | superseded, as above |
+| 8d5e9a3 | fix(libre): percent-encode profile file URL before shell quoting | superseded, as above |
+| 356ed91 | refactor(libre): encode profile URL only on Unix with explicit safe path characters | superseded, as above |
+| 923376d | test(libre): assert literal percent-encoded file URLs and intact shell args | superseded, as above |
+| 128e9db | Check attachment disk readability before serving previews (#35) | ported `290feef` (core's file_readable through a lambda) |
+| a213a44 | Fix repository attachment links after cached preview conversion (#36) | ported `f4fef30` (Pathname half was 35fc297 in round 5; Attachment#asset_link and top-level ./ path fixed too) |
+| 6b27fe7 | Report Cliff email resource-limit refusals as HTTP 413 (#38) | ported `352b3ba`, deviating: 413 with the translated reason as body and as a warning on the page (upstream: log only) |
+| 504c42f | Remove repository preview cache when repository is deleted (#37) | ported `c78be95` (per repository class storage root) |
+| 2bec017 | Keep Cliff email header labels on one line | ported `c037bcc` |
+| 9e2c960 | Keep bundled Cliff headers template in sync | ported `c037bcc` |
+| f42cd99 | Remove obsolete Ruby API and unused markup quoting (#39) | ported `129a700` (File.exist? half was 010837c) |
+| 3906119 | Add alternative text to Vince vCard PHOTO and LOGO images (#40) | ported `7756cb6` |
+| 4540b78 | Translate the Libre format settings error | ported `50bb633` (folded in, all locales) |
+| 4fc7d00 | WIP: sandbox LibreOffice conversions with bubblewrap | ported `3ae2ab9` |
+| cef06a3 | Security: sandbox LibreOffice conversions with bubblewrap | ported `3ae2ab9` (no fix_image_path, never on this branch; cache identity libre-sandbox-v1; purge rake option) and `6444bed` (README) |
+| 45d8d0a | Prepare v6.1.3: update plugin version and security changelog | not needed: upstream version and changelog (our plugin version stays 5.0.9; Libre 1.1.2 changelog in its init.rb) |
+| 9aa8ab4 | Prepare v6.1.3: update release notes and Linux sandbox warning | not needed: upstream release notes |
+| 448caa9 | CI: fail instead of skipping Libre sandbox integration when required | ported `3ae2ab9` (RMP_LIBRE_REQUIRE_SANDBOX) |
+| cc7e844 | CI: require LibreOffice sandbox integration tests | ported `3ae2ab9` (manual workflow installs bubblewrap, libreoffice-writer, poppler-utils) |
+| 3638ae9 | docs: clarify NilText production warning for 6.1.3 | ported `6444bed` (NilText warning, all locales) |
+| f99bb60 | docs: align NilText and Libre format guidance for 6.1.3 | ported `6444bed` (README) |
+| 2fb03f3 | docs: align Japanese NilText warning for 6.1.3 | ported `6444bed` |
+| 9c725be | docs: finalize 6.1.3 changelog heading for release | not needed: changelog heading |
 
 ## After the upgrade (production)
 
@@ -357,8 +511,8 @@ Actions the person doing the upgrade must take, or know about, for this plugin:
   2026-10-07, q3 "Advies volgen"), once, after the deploy:
   `RAILS_ENV=production bundle exec rake redmine_more_previews:use_core_previews`
   (first with `DRY_RUN=1` to see the list; a second run reports "Nothing to change"). Libre,
-  cliff, zippy and vince stay as configured. Install LibreOffice on the server for libre; core
-  needs Pandoc for its own Office preview and for mark.
+  cliff, zippy and vince stay as configured. Libre needs LibreOffice and bubblewrap (round 6, below);
+  core needs Pandoc for its own Office preview and for mark.
 - Remove the 5.1 repository preview cache once: `rm -rf <redmine>/tmp/more_previews/repository`
   (5.1 kept repository previews in `repository/gits/<identifier>/<path>`, shared between projects with
   the same identifier; Redmine 7 builds them on demand in `repository/gits/<id>/<revision>/<path>`.
@@ -370,7 +524,8 @@ Actions the person doing the upgrade must take, or know about, for this plugin:
   ImageMagick's `policy.xml` the coders PS, PS2, PS3, EPS, EPI, EPSI, EPSF, MVG, MSL, TEXT, URL, HTTP,
   HTTPS and FTP disabled (from curecodejp's README; they do not stop PostScript reaching Ghostscript
   through the PDF coder, which Maggie's start-of-file check does).
-- Empty the preview cache once after deploying: `rm -rf <redmine>/tmp/more_previews/*`. Cached zip
+- Empty the preview cache once after deploying: `rm -rf <redmine>/tmp/more_previews/*`, or since
+  round 6 the rake task with `DAYS=0 CONFIRM_PURGE_ALL=1` (below). Cached zip
   tables from before still carry the double-encoded links, and repository previews moved to a new
   layout (by repository id and revision; the old directories are never read again).
 - The mark converter (md/textile) needs `pandoc` on the server, zippy nothing, maggie ImageMagick,
@@ -401,6 +556,58 @@ Actions the person doing the upgrade must take, or know about, for this plugin:
   a preview in use is skipped and removed on the next run).
 - Only administrators can reload a preview or ask for Cliff's unsafe preview now; tell the users
   the "Update" link is gone for them.
+- **Libre in its bubblewrap sandbox (round 6, curecodejp 6.1.3).** Libre converts nothing without
+  a working sandbox (no fallback); Jan accepted Libre off until it works. Prerequisites, on the
+  Redmine server:
+  1. Packages from the distribution: `apt install bubblewrap libreoffice-writer libreoffice-calc
+     libreoffice-impress` (whatever document types Libre previews; `fonts-liberation` or the fonts
+     the documents use). Libre runs `/usr/bin/soffice`, `/usr/bin/bwrap` and `/usr/bin/env` by
+     those paths; a TDF `.deb` under `/opt/libreoffice*` reached through PATH is **not** supported.
+     Optional for checking: `poppler-utils` (pdfimages).
+  2. Unprivileged user namespaces for bwrap. On Ubuntu 23.10 and later (24.04 included) AppArmor
+     restricts them: `sysctl kernel.apparmor_restrict_unprivileged_userns` prints 1, and
+     `sudo -u <redmine user> bwrap --unshare-user --ro-bind / / true` fails with "setting up uid
+     map: Permission denied" (or "No permissions to create a new namespace"). The narrowest fix is an
+     AppArmor profile that allows user namespaces to bwrap alone, not the sysctl for the whole
+     system. If `/etc/apparmor.d/bwrap-userns-restrict` exists (newer AppArmor packages ship it),
+     check that it is loaded (`aa-status | grep bwrap`). Otherwise create `/etc/apparmor.d/bwrap`:
+     ```
+     abi <abi/4.0>,
+     include <tunables/global>
+
+     profile bwrap /usr/bin/bwrap flags=(unconfined) {
+       userns,
+       include if exists <local/bwrap>
+     }
+     ```
+     and load it with `sudo apparmor_parser -r /etc/apparmor.d/bwrap` (it survives reboots).
+     Also check `sysctl user.max_user_namespaces` (must be above 0) and, in a container, that its
+     seccomp profile allows `clone(CLONE_NEWUSER)`. Not assumed for Jan's server: check it there.
+     Ubuntu's LibreOffice AppArmor profiles (`usr.lib.libreoffice.program.*`) are in complain mode
+     by default; if conversions fail, `journalctl -k | grep -i apparmor` shows a DENIED line.
+  3. As the Redmine service user, the sandbox probe and a harmless conversion:
+     `sudo -u <redmine user> /usr/bin/env -i /usr/bin/bwrap --die-with-parent --new-session
+     --unshare-user --unshare-pid --unshare-net --unshare-ipc --unshare-uts --ro-bind /usr /usr
+     --symlink usr/bin /bin --symlink usr/lib /lib --symlink usr/lib64 /lib64 -- /usr/bin/true && echo
+     sandbox ok`, then in Redmine Administration > Information "LibreOffice available in its sandbox
+     (bubblewrap)" must be checked, and a .docx and an .odt attachment previewed as PDF and HTML
+     (upstream asks to check that an external file reference is not embedded: the e2e file
+     `external-image.odt` of test/e2e/seed.rb is such a document).
+  4. The cache identity changed (`libre-sandbox-v1`): no preview stored before is served again (an
+     old Libre PDF may hold a file of the server; an old debug preview may hold paths). The files
+     stay until the cache clean removes them; remove them all once, in the maintenance window,
+     with Redmine stopped or not, under the same per-preview locks:
+     `cd <redmine> && RAILS_ENV=production bundle exec rake redmine_more_previews:cache:clean DAYS=0 CONFIRM_PURGE_ALL=1`
+     (DAYS=0 without CONFIRM_PURGE_ALL=1 is refused). This replaces the `rm -rf
+     tmp/more_previews/*` above. The daily `DAYS=30` run stays as it is; it also finishes the
+     removal of a deleted repository's previews that a running conversion delayed.
+  5. Libre formats: html, txt, pdf, png, jpg only (per file type as the settings page offers);
+     another value is refused when the settings are saved. Windows: Libre is unavailable.
+- If converter debug was ever on (NilText, or the global "debug"): the purge in 4 removes its
+  stored previews; debug previews now show converter, versions, source type and format only.
+  NilText stays off in production.
+- With the project module "Redmine More Previews" off, the direct preview URLs answer 404 now
+  (they converted before); the pages fall back to Redmine's own as before.
 
 ## How to test
 
