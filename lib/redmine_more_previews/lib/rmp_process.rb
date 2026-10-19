@@ -36,6 +36,12 @@ module RedmineMorePreviews
       # seconds a stopped command gets to exit after TERM, before KILL
       KILL_GRACE = 3
       POLL       = 0.05
+      # the exit status of a child refused at a limit (ConverterTooLarge): the
+      # parent cannot rescue the child's exception, it raises its own (upstream
+      # 6b27fe7). The reason of a ConverterRefused, up to MAX_REASON bytes, comes
+      # through a pipe
+      TOO_LARGE_EXIT = 75
+      MAX_REASON     = 4096
       
       # command: a String (run by the shell if it needs one) or an Array (run
       # without a shell). The block, if given, is called right after the spawn,
@@ -77,16 +83,19 @@ module RedmineMorePreviews
       # two looks.
       #
       # Returns whether the block ran to its end (false when it raised, or the
-      # child was killed or stopped for its memory); raises ConverterTimeout when
-      # the time limit passes. Without fork (Windows) the block runs in this
-      # process, with neither limit.
+      # child was killed or stopped for its memory); raises ConverterTooLarge
+      # (ConverterRefused with the child's reason) when the block was refused at a
+      # limit, ConverterTimeout when the time limit passes. Without fork (Windows)
+      # the block runs in this process, with neither limit.
       def self.fork( timeout:, memory: nil )
         unless Process.respond_to?( :fork )
           yield
           return true
         end
+        reader, writer = IO.pipe
         pid = Process.fork do
           begin
+            reader.close
             # the system's default: Ruby's DEFAULT raises SignalException, which
             # a rescue Exception in the block would take for an error
             CHILD_SIGNALS.each {|signal| Signal.trap( signal, "SYSTEM_DEFAULT" ) rescue nil }
@@ -94,17 +103,29 @@ module RedmineMorePreviews
             limit_address_space( 2 * memory ) if memory
             yield
             exit!( 0 )
+          rescue Exceptions::ConverterTooLarge => e
+            writer.write( e.message.to_s.byteslice( 0, MAX_REASON ) ) if e.is_a?( Exceptions::ConverterRefused ) rescue nil
+            exit!( TOO_LARGE_EXIT )
           rescue Exception
             exit!( 1 )
           end
         end
+        writer.close
         # also here: the group must exist before stop signals it
         Process.setpgid( pid, pid ) rescue nil
         status = watch( pid, now + timeout, memory )
         raise Exceptions::ConverterTimeout, "child timed out after #{timeout}s" if status.nil?
+        if status.is_a?( Process::Status ) && status.exitstatus == TOO_LARGE_EXIT
+          reason = reader.read_nonblock( MAX_REASON, exception: false )
+          reason = reason.is_a?( String ) ? reason.force_encoding( Encoding::UTF_8 ).scrub : ""
+          raise Exceptions::ConverterRefused, reason if reason.present?
+          raise Exceptions::ConverterTooLarge, "the conversion was refused at a limit"
+        end
         status.is_a?( Process::Status ) && status.success?
       ensure
         stop( pid, status.is_a?( Process::Status ) ? status : nil ) if pid
+        reader&.close
+        writer&.close unless writer.nil? || writer.closed?
       end #def
       
       # waits for the child until deadline: its status, :memory once its resident

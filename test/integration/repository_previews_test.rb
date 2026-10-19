@@ -193,6 +193,25 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  # upstream 6b27fe7 (#38): an email beyond Cliff's limits is answered with 413,
+  # and the entry page says why
+  def test_mail_beyond_the_limits_is_answered_with_413_and_its_reason
+    with_converters(CONVERTERS) do
+      # the sample is smaller than the smallest size limit that can be set
+      Cliff.any_instance.stubs(:limit).with('max_size').returns(0)
+      Cliff.any_instance.stubs(:limit).with { |key| key != 'max_size' }.returns(1000)
+      reason = I18n.t(:'redmine_more_previews.cliff.text_refused_size', :size => 0, :locale => :en)
+      log_user('jsmith', 'jsmith')
+      get '/projects/ecookbook/repository/samples/entry/sample.eml'
+      assert_response :success
+      assert_select '#content p.warning', :text => reason
+      RedmineMorePreviews::Lib::RmpFailures.stubs(:recorded).returns(nil)
+      get '/projects/ecookbook/repository/samples/preview/sample.eml@/index.html'
+      assert_response 413
+      assert_equal reason, response.body
+    end
+  end
+
   def test_more_preview_is_allowed_with_browse_repository_alone
     # entry needs browse_repository; its preview frame must not need more
     Role.find(1).remove_permission!(:view_changesets)

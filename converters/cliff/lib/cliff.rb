@@ -137,14 +137,19 @@ class Cliff < RedmineMorePreviews::Conversion
     
     File.open(tmptarget, "wb") {|f| f.write html }
     
+  rescue ConverterTooLarge => e
+    # the limit and the reason for the operator; the exception leaves the child
+    # (see Lib::RmpProcess.fork) and the request is answered with 413
+    Rails.logger.warn "Email #{File.basename(source)} not previewed: #{e.message}"
+    raise
   rescue StandardError => e
     # running out of memory or a signal is no error of the email: the child
     # fails (see Conversion#isolated), no error page is stored.
-    # The message can quote the mail being parsed, so it is attacker controlled.
-    # The page tells why a limit refused the email; any other message can name
-    # the paths of the server (f.i. a system call's), which go to the log only
+    # The message can quote the mail being parsed, so it is attacker controlled,
+    # or name the paths of the server (f.i. a system call's): it goes to the log
+    # only, the page says that the email could not be previewed
     Rails.logger.error "Email #{File.basename(source)} not previewed: #{e.class}: #{e.message}\n#{Array(e.backtrace).join("\n")}"
-    reason = e.is_a?( ConverterBadArgument ) ? e.message : I18n.translate( :"redmine_more_previews.cliff.text_not_previewed" )
+    reason = I18n.translate( :"redmine_more_previews.cliff.text_not_previewed" )
     File.open(tmptarget, "wb") {|f| f.write ERB::Util.html_escape(reason) }
   end #def
   
@@ -294,9 +299,11 @@ class Cliff < RedmineMorePreviews::Conversion
     MAX_MEMORY
   end #def
   
-  # an email refused at a limit: the reason is shown as its preview
+  # an email refused at a limit: answered with 413, the reason (translated, made
+  # of the limits alone) is its body and is shown on the email's page (upstream
+  # 6b27fe7 answers 413 with the reason in the log only)
   def refuse( key, values )
-    raise ConverterBadArgument, I18n.translate( :"redmine_more_previews.cliff.#{key}", **values )
+    raise ConverterRefused, I18n.translate( :"redmine_more_previews.cliff.#{key}", **values )
   end #def
   
   def limit( key )

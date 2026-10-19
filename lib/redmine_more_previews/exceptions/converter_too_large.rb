@@ -26,5 +26,10 @@ module RedmineMorePreviews
     # the request is answered with 413, the conversion is not attempted or its
     # result not served
     class ConverterTooLarge < StandardError; end
+    
+    # a limit refused the file for a reason the user may read: translated, it
+    # quotes nothing of the file and no path. It is the body of the 413 and is
+    # shown on the page (see Cliff#refuse)
+    class ConverterRefused < ConverterTooLarge; end
   end
 end

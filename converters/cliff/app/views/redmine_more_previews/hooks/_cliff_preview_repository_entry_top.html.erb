@@ -9,7 +9,7 @@
   
   <%# converted while the page is rendered: no free conversion slot, or an email
       beyond the limits, leaves the boxes out instead of turning the page into a 503
-      (the preview frame below answers for itself) %>
+      or 413 (the preview frame below answers for itself) %>
   <%- begin %>
   <%- repository.more_asset( path, rev, :assets => ["headers.html", "fields.html", "attachments.html"] ) do |html, asset, email_headers, email_fields, email_attachments| %>
   
@@ -27,7 +27,11 @@
     <%- end %>
     
   <%- end %>
-  <%- rescue RedmineMorePreviews::Exceptions::ConverterLockTimeOut, RedmineMorePreviews::Exceptions::ConverterTooLarge %>
+  <%- rescue RedmineMorePreviews::Exceptions::ConverterLockTimeOut %>
+  <%- rescue RedmineMorePreviews::Exceptions::ConverterTooLarge => e %>
+    <%# the preview frame below answers 413, which browsers do not show in an
+        object frame: the page says why %>
+    <p class="warning"><%= e.is_a?(RedmineMorePreviews::Exceptions::ConverterRefused) ? e.message : l(:text_more_previews_too_large) %></p>
   <%- end %>
   
 <% end %>

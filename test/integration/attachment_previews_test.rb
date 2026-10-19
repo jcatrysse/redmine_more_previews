@@ -188,6 +188,51 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  TWO_PARTS = "Subject: big\r\nMIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=\"b\"\r\n\r\n" \
+              "--b\r\nContent-Type: text/plain\r\n\r\nfirst\r\n--b\r\nContent-Type: text/plain\r\n\r\nsecond\r\n--b--\r\n"
+
+  # upstream 6b27fe7 (#38): an email beyond Cliff's limits is answered with 413,
+  # not stored as a preview; the body and the page say why, in the user's language
+  def test_mail_beyond_the_limits_is_answered_with_413_and_its_reason
+    attachment = preview_attachment(@issue, 'too-many.eml', TWO_PARTS)
+    cliff = CONVERTERS.slice(:cliff)
+    with_converters(cliff) do
+      settings = Setting.plugin_redmine_more_previews
+      settings['converter']['cliff']['max_parts'] = '1'
+      Setting.plugin_redmine_more_previews = settings
+      log_user('jsmith', 'jsmith')
+      get "/attachments/more_preview/#{attachment.id}/index.html"
+      assert_response 413
+      assert_equal I18n.t(:'redmine_more_previews.cliff.text_refused_parts', :count => 1, :locale => :en), response.body
+      assert_not File.exist?(attachment.preview_filepath(:format => 'html'))
+      # remembered: refused again at once, without converting
+      Cliff.any_instance.expects(:eml).never
+      get "/attachments/more_preview/#{attachment.id}/index.html"
+      assert_response 413
+      assert_equal I18n.t(:text_more_previews_too_large, :locale => :en), response.body
+      Cliff.any_instance.unstub(:eml)
+
+      User.find(2).update!(:language => 'de')
+      RedmineMorePreviews::Lib::RmpFailures.forget(attachment.preview_filepath(:format => 'html'))
+      get "/attachments/#{attachment.id}"
+      assert_response :success
+      assert_select '#content p.warning', :text => I18n.t(:'redmine_more_previews.cliff.text_refused_parts', :count => 1, :locale => :de)
+      assert_select '#preview_pane'
+    end
+  end
+
+  def test_mail_within_the_limits_is_still_previewed
+    attachment = preview_attachment(@issue, 'sample.eml')
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get "/attachments/#{attachment.id}"
+      assert_response :success
+      assert_select '#content p.warning', 0
+      get "/attachments/more_preview/#{attachment.id}/index.html"
+      assert_response :success
+    end
+  end
+
   def test_zip_table_and_top_level_asset
     attachment = preview_attachment(@issue, 'sample.zip')
     with_converters(CONVERTERS) do

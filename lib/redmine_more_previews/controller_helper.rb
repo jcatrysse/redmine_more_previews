@@ -77,9 +77,11 @@ module RedmineMorePreviews
     private :render_more_preview_busy
 
     # a file, an archive entry or a preview is larger than its limit (see
-    # Converter.max_repository_file, Converter.max_output, Zippy::LIMITS)
+    # Converter.max_repository_file, Converter.max_output, Zippy::LIMITS); an
+    # email refused at one of Cliff's limits says which (ConverterRefused)
     def render_more_preview_too_large(exception)
-      render :plain => l(:text_more_previews_too_large), :status => 413, :content_type => 'text/plain'
+      text = exception.is_a?(RedmineMorePreviews::Exceptions::ConverterRefused) ? exception.message : l(:text_more_previews_too_large)
+      render :plain => text, :status => 413, :content_type => 'text/plain'
     end
     private :render_more_preview_too_large
     

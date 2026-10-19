@@ -68,24 +68,24 @@ class CliffLimitsTest < ActiveSupport::TestCase
   def test_email_larger_than_the_limit_is_not_parsed
     with_cliff_settings('max_size' => '1') do
       Mail.expects(:new).never
-      html = convert("Subject: big\n\n" + ('x' * (1024 * 1024 + 1)))
-      assert_includes html, 'larger than 1 MiB'
+      assert_includes refusal("Subject: big\n\n" + ('x' * (1024 * 1024 + 1))), 'larger than 1 MiB'
     end
   end
 
-  # the page of an email that is not previewed says why, not where in the code
+  # an email refused at a limit is answered with 413 (upstream 6b27fe7), with the
+  # reason, not where in the code; nothing is stored as its preview
   def test_refused_email_shows_no_backtrace
     with_cliff_settings('max_size' => '1') do
-      html = convert("Subject: big\n\n" + ('x' * (1024 * 1024 + 1)))
-      assert_equal 'the email is larger than 1 MiB', html
+      assert_equal 'the email is larger than 1 MiB', refusal("Subject: big\n\n" + ('x' * (1024 * 1024 + 1)))
+      assert_not File.exist?(File.join(@last_target, 'index.html'))
     end
   end
 
   # the reason is a text of the plugin, in the language of the conversion
   def test_refused_email_says_why_in_the_users_language
     with_cliff_settings('max_size' => '1') do
-      html = I18n.with_locale(:de) { convert("Subject: big\n\n" + ('x' * (1024 * 1024 + 1))) }
-      assert_equal 'Die E-Mail ist größer als 1 MiB', html.dup.force_encoding(Encoding::UTF_8)
+      reason = I18n.with_locale(:de) { refusal("Subject: big\n\n" + ('x' * (1024 * 1024 + 1))) }
+      assert_equal 'Die E-Mail ist größer als 1 MiB', reason
     end
   end
 
@@ -99,7 +99,7 @@ class CliffLimitsTest < ActiveSupport::TestCase
     source = mail_with_attachments(20)
     with_cliff_settings('max_parts' => '10') do
       Mail.expects(:new).never
-      assert_includes convert(source), 'more than 10 parts'
+      assert_includes refusal(source), 'more than 10 parts'
     end
   end
 
@@ -112,7 +112,7 @@ class CliffLimitsTest < ActiveSupport::TestCase
       assert_equal 20, Mail.new(source).parts.size, "Mail splits the parts (#{param})"
       with_cliff_settings('max_parts' => '10') do
         Mail.expects(:new).never
-        assert_includes convert(source), 'more than 10 parts', param
+        assert_includes refusal(source), 'more than 10 parts', param
         Mail.unstub(:new)
       end
     end
@@ -125,7 +125,7 @@ class CliffLimitsTest < ActiveSupport::TestCase
     source = "Subject: t\nMIME-Version: 1.0\nContent-Type: multipart/mixed; boundary=\"abc\"\n\n#{body}"
     with_cliff_settings('max_parts' => '10') do
       Mail.expects(:new).never
-      assert_includes convert(source), 'more than 10 parts'
+      assert_includes refusal(source), 'more than 10 parts'
     end
   end
 
@@ -146,7 +146,7 @@ class CliffLimitsTest < ActiveSupport::TestCase
       assert_operator depth_of(Mail.new(source)), :>, Cliff::MAX_DEPTH, "Mail nests the parts (#{form})"
       Mail::Message.any_instance.expects(:attachments).never
       Mail::Message.any_instance.expects(:html_part).never
-      assert_includes convert(source), "more than #{Cliff::MAX_DEPTH} nested multipart parts", form
+      assert_includes refusal(source), "more than #{Cliff::MAX_DEPTH} nested multipart parts", form
       Mail::Message.any_instance.unstub(:attachments)
       Mail::Message.any_instance.unstub(:html_part)
     end
@@ -164,7 +164,7 @@ class CliffLimitsTest < ActiveSupport::TestCase
     source = nested(NESTED_FORMS['plain'], 10, 'x' * (700 * 1024))
     with_cliff_settings('max_size' => '1') do
       Mail::Message.any_instance.expects(:attachments).never
-      assert_includes convert(source), "add up to more than #{Cliff::MAX_PARSED} MiB"
+      assert_includes refusal(source), "add up to more than #{Cliff::MAX_PARSED} MiB"
     end
   end
 
@@ -174,7 +174,7 @@ class CliffLimitsTest < ActiveSupport::TestCase
     n = 1024 * 1024
     ["From " + ('a' * n), "From" + ("\n" * n) + ":", "From" + (' ' * n), "From \u00e9" + ('a' * n), "From \0" + ('a' * n)].each do |start|
       Mail.expects(:new).never
-      assert_includes convert(start + "\r\nSubject: x\r\n\r\nbody"), "line longer than #{Cliff::MAX_LINE} characters"
+      assert_includes refusal(start + "\r\nSubject: x\r\n\r\nbody"), "line longer than #{Cliff::MAX_LINE} characters"
       Mail.unstub(:new)
     end
   end
@@ -230,7 +230,7 @@ class CliffLimitsTest < ActiveSupport::TestCase
     worker = RedmineMorePreviews::Converter.find(:cliff).worker(:preview_format => 'html', :object => {}, :target => File.join(@tmp, 'index.html'))
     GC.disable
     before = GC.stat(:total_allocated_objects)
-    assert_raises(RedmineMorePreviews::Exceptions::ConverterBadArgument) { worker.send(:check_parts, text) }
+    assert_raises(RedmineMorePreviews::Exceptions::ConverterRefused) { worker.send(:check_parts, text) }
     assert_operator GC.stat(:total_allocated_objects) - before, :<, 20_000
   ensure
     GC.enable
@@ -306,11 +306,19 @@ class CliffLimitsTest < ActiveSupport::TestCase
   end
 
   # converts the email; returns the preview, keeps the extracted attachments
+  # the reason an email is refused with, out of the child it is parsed in
+  def refusal(source)
+    error = assert_raises(RedmineMorePreviews::Exceptions::ConverterRefused) { convert(source) }
+    error.message.dup.force_encoding(Encoding::UTF_8)
+  end
+
   def convert(source)
     eml = File.join(@tmp, "#{SecureRandom.hex(4)}.eml")
     File.binwrite(eml, source)
+    # a failure is remembered per target (upstream 6b27fe7): a target per call
+    @last_target = File.join(@tmp, SecureRandom.hex(4), 'preview.html')
     worker = RedmineMorePreviews::Converter.find(:cliff).worker(
-      :preview_format => 'html', :object => {}, :target => File.join(@tmp, 'preview.html', 'index.html'),
+      :preview_format => 'html', :object => {}, :target => File.join(@last_target, 'index.html'),
       :assets => %w(attachments.html)
     )
     preview = nil

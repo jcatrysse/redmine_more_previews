@@ -79,6 +79,27 @@ class RmpProcessTest < ActiveSupport::TestCase
     assert_not RmpProcess.fork(timeout: 5) { raise 'broken' }
   end
 
+  # upstream 6b27fe7: a refusal at a limit in the child is raised in the parent,
+  # without the child's message (it could name a path)
+  def test_child_limit_refusal_is_raised_in_parent
+    too_large = RedmineMorePreviews::Exceptions::ConverterTooLarge
+    error = assert_raises(too_large) do
+      RmpProcess.fork(timeout: 5) { raise too_large, 'source private path' }
+    end
+    assert_not_kind_of RedmineMorePreviews::Exceptions::ConverterRefused, error
+    assert_not_includes error.message, 'private path'
+  end
+
+  # the reason of a refusal for the user comes out of the child
+  def test_child_refusal_reason_is_raised_in_parent
+    refused = RedmineMorePreviews::Exceptions::ConverterRefused
+    error = assert_raises(refused) do
+      RmpProcess.fork(timeout: 5) { raise refused, 'die E-Mail ist größer als 1 MiB' }
+    end
+    assert_equal 'die E-Mail ist größer als 1 MiB', error.message
+    assert_equal Encoding::UTF_8, error.message.encoding
+  end
+
   def test_block_is_stopped_at_the_time_limit
     out = File.join(@dir, 'pid')
     elapsed = measure do
