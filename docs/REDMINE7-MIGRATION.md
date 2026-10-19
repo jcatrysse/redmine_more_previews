@@ -240,6 +240,10 @@ migration sessions; this plugin's scenarios pass there):
   plugin preview (the module check needs a project; core previews it as before); the sandbox probe
   runs for each conversion and status check (one bwrap start, milliseconds).
 
+- Round 6: OpenAI review (gpt-5) of `8202ac6..592dbc9`, `docs/reviews/openai-2026-10-19-592dbc9.md`: 1
+  finding (an "undefined `now`" in RmpProcess.fork), not a defect (`RmpProcess.now`, unchanged since
+  round 5), resolution recorded there.
+
 ### Not tested here (needs production or is out of reach)
 
 - The PDF viewer inside the page (headless Chromium has no PDF plugin; the PDFs are checked through
