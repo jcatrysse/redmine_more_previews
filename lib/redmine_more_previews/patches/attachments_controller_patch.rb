@@ -35,6 +35,9 @@ module RedmineMorePreviews
           # replace core's (and its :only list); calling the methods keeps other plugins'
           # prepends on them in the chain (no alias_method copies)
           before_action -> { find_attachment },            :only => [:more_preview, :more_asset]
+          # as core's show and download: a file missing on disk is a 404, before any
+          # cache, ETag or conversion work (upstream 128e9db)
+          before_action -> { file_readable },              :only => [:more_preview, :more_asset]
           before_action -> { read_authorize },             :only => [:more_preview, :more_asset]
           before_action :ensure_more_previews_module_enabled, :only => [:more_preview, :more_asset]
           before_action :find_asset_param,                 :only => [:more_preview, :more_asset]

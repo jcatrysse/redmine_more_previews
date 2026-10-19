@@ -259,6 +259,33 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  # upstream 128e9db (#35): as core's show and download, a file missing on disk
+  # is not found for every preview endpoint, and nothing is converted
+  def test_missing_disk_file_is_not_found_by_all_preview_endpoints
+    attachment = preview_attachment(@issue, 'sample.zip')
+    File.delete(attachment.diskfile)
+    assert_not attachment.readable?
+    Zippy.any_instance.expects(:convert).never
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get "/attachments/more_preview/#{attachment.id}/index.html"
+      assert_response :not_found
+      get "/attachments/more_preview/#{attachment.id}/index.html", :params => { :asset => 'top.txt' }
+      assert_response :not_found
+      get "/attachments/more_preview/#{attachment.id}/top.txt"
+      assert_response :not_found
+      reset!
+      # reload and unsafe skip the cache, for administrators
+      log_user('admin', 'admin')
+      get "/attachments/more_preview/#{attachment.id}/index.html", :params => { :unsafe => '1' }
+      assert_response :not_found
+      get "/attachments/more_preview/#{attachment.id}/top.txt", :params => { :reload => '1' }
+      assert_response :not_found
+      get "/attachments/#{attachment.id}"
+      assert_response :not_found
+    end
+  end
+
   def test_tgz_asset
     attachment = preview_attachment(@issue, 'sample.tgz')
     with_converters(CONVERTERS) do
