@@ -17,13 +17,13 @@ Currently, there exist the following plugins:
 
 ![Libre](doc/libre/logo.png "Libre")
 
-This plugin requires LibreOffice to be installed on your system. LibreOffice must be reachable with "soffice" to the user, the redmine service is executed by.
+Libre needs Linux, a LibreOffice package of the distribution at `/usr/bin/soffice`, and bubblewrap (`/usr/bin/bwrap`) that the Redmine service user can run with unprivileged user, mount, PID, network, IPC and UTS namespaces. LibreOffice runs in that sandbox, which mounts only the input file (read-only), a private output directory and profile, and read-only system paths; it has no network. There is no fallback: without a working sandbox (Windows, no bwrap, user namespaces blocked, f.i. by AppArmor on Ubuntu 23.10 and later or a container's seccomp profile) Libre converts nothing, and Administration > Information shows its check failed. Check it as the Redmine service user with a harmless document before enabling Libre (from curecodejp 6.1.3).
 
 Libre uses LibreOffice to do the conversion. Libre converts almost everything LibreOffice can convert:
 
 .csv , .doc , .docm , .docx , .dotm , .dotx , .fodg , .fodp , .fods , .fodt , .odb , .odc , .odf , .odg , .odi , .odm , .odp , .ods , .odt , .otg , .oth , .otp , .ots , .ott , .oxt , .potm , .potx , .ppt , .pptm , .pptx , .rtf , .sda , .sdc , .sdd , .sdp , .sds , .sdw , .sgl , .smf , .stc , .std , .sti , .stw , .sxc , .sxd , .sxg , .sxi , .sxm , .sxw , .vor , .xls , .xlsm , .xlsx , .xltm , .xltx 
 
-to either pdf, html, inline, png, jpg or gif.
+to either pdf, html, txt, png or jpg (what each input format offers); another format is refused when the settings are saved.
 
 Please note, that not all conversions have been thoroughly tested yet. Please send files for a conversion test to me, if you are uncertain if your files get converted an can be viewed in a browser. Further, please note that the conversion accuracy strongly depends on the availability of installed fonts. Please consult the LibreOffice portals to see how to install fonts.
 
@@ -85,7 +85,7 @@ Vince lets you preview .vcf (vCard) files.
 
 ![NilText](doc/nil_text/logo.png "NilText") *DO NOT USE IN PRODUCTION* 
 
-NilText lets you see, which data are available for a file conversion. NilText not suited for production use. You can peruse this plugin to learn about the plugin functionality. Please note, that this plugin may reveal a password of a repository. Like all other plugins, **this plugin is deactivated by default**.
+NilText is a development and diagnostics converter for understanding the plugin's conversion interface; **do not enable it in production**. Debug previews show only the converter, its version, the plugin version, the source type and the preview format, no internal data. Like all other plugins, **this plugin is deactivated by default**.
 
 ---
 

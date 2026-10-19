@@ -22,7 +22,7 @@
 zh:
   label_example:                                   "例子"
   text_nil_program_available:                      "可用的例子-程序"
-  text_warning_do_not_use_in_production:           "不要在生产模式下使用，因为内部数据会被泄露!"
+  text_warning_do_not_use_in_production:           "NilText仅用于开发和诊断。不要在生产模式下启用。"
   redmine_more_previews:
     nil_text:
       text_explanation:                            "示例插件，探索编写自己的插件的功能。"

@@ -22,7 +22,7 @@
 fr:
   label_example :                                   "Exemple"
   text_nil_program_available :                      "Exemple-programme disponible"
-  text_warning_do_not_use_in_production :           "Ne pas utiliser en mode production, car des données internes sont révélées!"
+  text_warning_do_not_use_in_production :           "NilText sert uniquement au développement et au diagnostic. Ne pas l'activer en mode production."
   redmine_more_previews:
     nil_text:
       text_explanation:                             "Exemple de plugin pour explorer la fonctionnalité d'écriture de ses propres plugins."
