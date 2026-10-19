@@ -192,8 +192,32 @@ class LibreCommandTest < ActiveSupport::TestCase
       @worker.stubs(:sandbox_available?).returns(true)
       @worker.stubs(:soffice).returns('fake')
       @worker.expects(:command).once.returns(true)
-      assert_raises(RedmineMorePreviews::Exceptions::ConverterShellError) { @worker.convert }
+      error = assert_raises(RedmineMorePreviews::Exceptions::ConverterShellError) { @worker.convert }
+      # refused for the link itself, before anything is renamed (own review)
+      assert_equal 'LibreOffice produced an unsafe output entry', error.message
+      assert_not File.exist?(@worker.tmptarget)
+      assert File.symlink?(File.join(dir, 'document.pdf'))
     end
+  end
+
+  # own review of round 6: the probe uses the plugin's process handling, a hang
+  # or a system error is a failed check, not an exception on the info page
+  def test_probe_failures_are_a_failed_check
+    worker = Libre.allocate
+    RedmineMorePreviews::Lib::RmpProcess.stubs(:run).raises(RedmineMorePreviews::Exceptions::ConverterTimeout)
+    assert_equal false, worker.send(:sandbox_available?)
+    worker = Libre.allocate
+    RedmineMorePreviews::Lib::RmpProcess.stubs(:run).raises(Errno::ENOMEM)
+    assert_equal false, worker.send(:sandbox_available?)
+  end
+
+  # own review of round 6: a LibreOffice linked from /usr/bin/soffice to /opt
+  # is outside the sandbox's mounts and would fail every conversion
+  def test_soffice_outside_the_mounted_paths_is_no_sandbox
+    worker = Libre.allocate
+    File.stubs(:realpath).returns('/opt/libreoffice25.8/program/soffice')
+    RedmineMorePreviews::Lib::RmpProcess.expects(:run).never
+    assert_equal false, worker.send(:sandbox_available?)
   end
 
   def test_source_named_index_does_not_rename_file_onto_itself

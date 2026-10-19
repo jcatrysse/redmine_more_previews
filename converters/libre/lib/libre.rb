@@ -19,9 +19,6 @@
 # Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
 #
 
-require 'open3'
-require 'timeout'
-
 # LibreOffice runs in a bubblewrap sandbox (upstream 4fc7d00, cef06a3): no
 # network, its own user, PID, IPC and UTS namespaces, an empty environment, and
 # of the host only the input file (read-only), a writable output directory and
@@ -65,12 +62,16 @@ class Libre < RedmineMorePreviews::Conversion
   
   # whether bubblewrap starts a sandbox with the namespaces Libre uses: an
   # executable bwrap is not enough (user namespaces may be off, or forbidden by
-  # AppArmor or a container's seccomp profile). Probed once per worker, in at
-  # most 5 seconds
+  # AppArmor or a container's seccomp profile). soffice must resolve inside the
+  # paths the sandbox mounts (/usr/bin, /usr/lib): a LibreOffice under /opt
+  # linked from /usr/bin/soffice would pass the probe and fail every conversion.
+  # Probed for each worker (each conversion and each status check), in at most
+  # 5 seconds, with the plugin's process handling
   def sandbox_available?
     return false if Redmine::Platform.mswin?
     return false unless [LIBRE_OFFICE_BIN, BWRAP_BIN, ENV_BIN].all? { |path| File.executable?(path) }
     return false unless File.directory?('/etc/fonts') && File.file?('/etc/ld.so.cache')
+    return false unless %w(/usr/bin/ /usr/lib/).any? { |dir| File.realpath(LIBRE_OFFICE_BIN).start_with?(dir) }
     
     return @sandbox_probe_ok unless @sandbox_probe_ok.nil?
     command = [ENV_BIN, '-i', BWRAP_BIN, '--die-with-parent', '--new-session',
@@ -84,8 +85,9 @@ class Libre < RedmineMorePreviews::Conversion
       end
     end
     command.concat(['--', '/usr/bin/true'])
-    @sandbox_probe_ok = Timeout.timeout(5) { Open3.capture3(*command).last.success? }
-  rescue Errno::ENOENT, Errno::EACCES, Timeout::Error
+    status = RedmineMorePreviews::Lib::RmpProcess.run(command, :timeout => 5, :in => File::NULL, :out => File::NULL, :err => File::NULL)
+    @sandbox_probe_ok = status.success?
+  rescue SystemCallError, ConverterTimeout
     @sandbox_probe_ok = false
   end #def
   private :sandbox_available?
