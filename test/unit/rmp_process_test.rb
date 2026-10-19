@@ -90,14 +90,22 @@ class RmpProcessTest < ActiveSupport::TestCase
     assert_not_includes error.message, 'private path'
   end
 
-  # the reason of a refusal for the user comes out of the child
+  # the reason of a refusal for the user comes out of the child, as its
+  # translation key and numbers
   def test_child_refusal_reason_is_raised_in_parent
     refused = RedmineMorePreviews::Exceptions::ConverterRefused
     error = assert_raises(refused) do
-      RmpProcess.fork(timeout: 5) { raise refused, 'die E-Mail ist größer als 1 MiB' }
+      RmpProcess.fork(timeout: 5) { raise refused.from('redmine_more_previews.cliff.text_refused_size', :size => 1) }
     end
-    assert_equal 'die E-Mail ist größer als 1 MiB', error.message
-    assert_equal Encoding::UTF_8, error.message.encoding
+    assert_equal 'redmine_more_previews.cliff.text_refused_size', error.key
+    assert_equal I18n.t(:'redmine_more_previews.cliff.text_refused_size', :size => 1), error.message
+    I18n.with_locale(:de) do
+      error = assert_raises(refused) do
+        RmpProcess.fork(timeout: 5) { raise refused.from('redmine_more_previews.cliff.text_refused_size', :size => 1) }
+      end
+      assert_equal 'Die E-Mail ist größer als 1 MiB', error.message
+      assert_equal Encoding::UTF_8, error.message.encoding
+    end
   end
 
   def test_block_is_stopped_at_the_time_limit

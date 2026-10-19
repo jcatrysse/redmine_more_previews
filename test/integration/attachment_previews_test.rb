@@ -205,19 +205,38 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
       assert_response 413
       assert_equal I18n.t(:'redmine_more_previews.cliff.text_refused_parts', :count => 1, :locale => :en), response.body
       assert_not File.exist?(attachment.preview_filepath(:format => 'html'))
-      # remembered: refused again at once, without converting
+      # remembered: refused again at once, without converting, with its reason
+      # (own review: it was the generic text until the failure was forgotten)
       Cliff.any_instance.expects(:eml).never
       get "/attachments/more_preview/#{attachment.id}/index.html"
       assert_response 413
-      assert_equal I18n.t(:text_more_previews_too_large, :locale => :en), response.body
+      assert_equal I18n.t(:'redmine_more_previews.cliff.text_refused_parts', :count => 1, :locale => :en), response.body
+
       Cliff.any_instance.unstub(:eml)
 
+      # and in the language of the next viewer; the page's header boxes convert
+      # on their own (as before) and say why
       User.find(2).update!(:language => 'de')
-      RedmineMorePreviews::Lib::RmpFailures.forget(attachment.preview_filepath(:format => 'html'))
+      get "/attachments/more_preview/#{attachment.id}/index.html"
+      assert_response 413
+      assert_equal I18n.t(:'redmine_more_previews.cliff.text_refused_parts', :count => 1, :locale => :de), response.body
       get "/attachments/#{attachment.id}"
       assert_response :success
       assert_select '#content p.warning', :text => I18n.t(:'redmine_more_previews.cliff.text_refused_parts', :count => 1, :locale => :de)
       assert_select '#preview_pane'
+    end
+  end
+
+  # a remembered refusal that is not one of the plugin's translations with
+  # numbers (the failure files are on disk) is the generic refusal
+  def test_remembered_refusal_is_only_a_translation_with_numbers
+    failures = RedmineMorePreviews::Lib::RmpFailures
+    assert_kind_of RedmineMorePreviews::Exceptions::ConverterRefused,
+                   failures.refusal('refused:{"key":"redmine_more_previews.cliff.text_refused_parts","values":{"count":3}}')
+    ['refused:{"key":"label_user_plural","values":{}}',
+     'refused:{"key":"redmine_more_previews.cliff.text_refused_parts","values":{"count":"<b>x</b>"}}',
+     'refused:not json', 'too_large'].each do |reason|
+      assert_nil failures.refusal(reason), reason
     end
   end
 

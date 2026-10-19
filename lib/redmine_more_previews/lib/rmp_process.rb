@@ -21,6 +21,7 @@
 #
 
 require "etc"
+require "json"
 
 module RedmineMorePreviews
   module Lib
@@ -38,8 +39,8 @@ module RedmineMorePreviews
       POLL       = 0.05
       # the exit status of a child refused at a limit (ConverterTooLarge): the
       # parent cannot rescue the child's exception, it raises its own (upstream
-      # 6b27fe7). The reason of a ConverterRefused, up to MAX_REASON bytes, comes
-      # through a pipe
+      # 6b27fe7). The translation key and numbers of a ConverterRefused, up to
+      # MAX_REASON bytes of JSON, come through a pipe
       TOO_LARGE_EXIT = 75
       MAX_REASON     = 4096
       
@@ -104,7 +105,7 @@ module RedmineMorePreviews
             yield
             exit!( 0 )
           rescue Exceptions::ConverterTooLarge => e
-            writer.write( e.message.to_s.byteslice( 0, MAX_REASON ) ) if e.is_a?( Exceptions::ConverterRefused ) rescue nil
+            writer.write( JSON.generate( "key" => e.key, "values" => e.values ).byteslice( 0, MAX_REASON ) ) if e.is_a?( Exceptions::ConverterRefused ) rescue nil
             exit!( TOO_LARGE_EXIT )
           rescue Exception
             exit!( 1 )
@@ -117,8 +118,8 @@ module RedmineMorePreviews
         raise Exceptions::ConverterTimeout, "child timed out after #{timeout}s" if status.nil?
         if status.is_a?( Process::Status ) && status.exitstatus == TOO_LARGE_EXIT
           reason = reader.read_nonblock( MAX_REASON, exception: false )
-          reason = reason.is_a?( String ) ? reason.force_encoding( Encoding::UTF_8 ).scrub : ""
-          raise Exceptions::ConverterRefused, reason if reason.present?
+          refused = Exceptions::ConverterRefused.from( *JSON.parse( reason ).values_at( "key", "values" ) ) rescue nil if reason.is_a?( String )
+          raise refused if refused
           raise Exceptions::ConverterTooLarge, "the conversion was refused at a limit"
         end
         status.is_a?( Process::Status ) && status.success?

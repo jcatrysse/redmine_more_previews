@@ -303,7 +303,7 @@ class Cliff < RedmineMorePreviews::Conversion
   # of the limits alone) is its body and is shown on the email's page (upstream
   # 6b27fe7 answers 413 with the reason in the log only)
   def refuse( key, values )
-    raise ConverterRefused, I18n.translate( :"redmine_more_previews.cliff.#{key}", **values )
+    raise ConverterRefused.from( "redmine_more_previews.cliff.#{key}", values )
   end #def
   
   def limit( key )

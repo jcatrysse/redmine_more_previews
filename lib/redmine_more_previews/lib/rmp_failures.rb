@@ -21,6 +21,7 @@
 #
 
 require 'digest'
+require 'json'
 
 module RedmineMorePreviews
   module Lib
@@ -34,7 +35,8 @@ module RedmineMorePreviews
     module RmpFailures
       
       # why a conversion failed: too_large is answered with 413 again, the others
-      # give no preview (404)
+      # give no preview (404). refused:<JSON> is a too_large whose reason is
+      # known (Exceptions::ConverterRefused, its translation key and numbers)
       REASONS = %w(error empty too_large).freeze
       
       # the reason, nil unless a failure is remembered
@@ -43,9 +45,25 @@ module RedmineMorePreviews
         path = path( key )
         return nil unless File.file?( path )
         return nil if Time.now - File.mtime( path ) > RedmineMorePreviews::Converter.failure_ttl
-        reason = File.read( path ).strip
-        REASONS.include?( reason ) ? reason : nil
+        reason = File.read( path, 4096 ).to_s.strip
+        REASONS.include?( reason ) || reason.start_with?( "refused:" ) ? reason : nil
       rescue SystemCallError
+        nil
+      end #def
+      
+      # the reason to record for a conversion refused at a limit
+      def self.too_large( exception )
+        return "too_large" unless exception.is_a?( Exceptions::ConverterRefused ) && exception.key
+        "refused:" + JSON.generate( "key" => exception.key, "values" => exception.values )
+      end #def
+      
+      # the ConverterRefused of a recorded refused:<JSON>, nil if it is not one
+      # of the plugin's translations with numbers (see ConverterRefused.from)
+      def self.refusal( reason )
+        return nil unless reason.start_with?( "refused:" )
+        data = JSON.parse( reason.delete_prefix( "refused:" ) )
+        data.is_a?( Hash ) ? Exceptions::ConverterRefused.from( data["key"], data["values"] ) : nil
+      rescue JSON::ParserError
         nil
       end #def
       

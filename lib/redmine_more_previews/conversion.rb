@@ -262,7 +262,10 @@ module RedmineMorePreviews
         Lib::RmpFailures.forget( whole )
       elsif !stored? && (reason = Lib::RmpFailures.recorded( targetpath ) || Lib::RmpFailures.recorded( whole ))
         Rails.logger.info "Preview for #{file.path} failed before (#{reason}), not converted again"
-        raise ConverterTooLarge, "#{File.basename(file.path)} failed before" if reason == "too_large"
+        # refused at a limit that says which: the reason again, in this viewer's language
+        if reason == "too_large" || reason.start_with?( "refused:" )
+          raise( Lib::RmpFailures.refusal( reason ) || ConverterTooLarge.new( "#{File.basename(file.path)} failed before" ) )
+        end
         return nil
       end
       
@@ -296,7 +299,7 @@ module RedmineMorePreviews
         # the conversion may have listed the asset meanwhile (see store_asset_list);
         # an asset too large exists, and is the asset's failure, not the preview's
         failure ||= targetpath if asset && (@asset_too_large || asset_listed == true)
-        Lib::RmpFailures.record( failure || whole_failed( whole ), "too_large" )
+        Lib::RmpFailures.record( failure || whole_failed( whole ), Lib::RmpFailures.too_large( e ) )
         raise
       rescue Exception => e
         Rails.logger.error "An error occured while generating preview for #{file.path}"
