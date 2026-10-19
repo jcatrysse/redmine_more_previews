@@ -45,6 +45,7 @@ de:
   text_help_redmine_more_previews_limits:                "Eine Konvertierung, die länger als das Zeitlimit läuft, wird mit allen Programmen, die sie gestartet hat, beendet (Libre erhält mindestens 120 Sekunden). Eine Anfrage wird mit 503 (später erneut versuchen) beantwortet, wenn alle Konvertierungen, über alle Redmine-Prozesse gezählt, belegt sind oder wenn sie länger als die Wartezeit auf ein Preview wartet, das gerade erzeugt wird. Eine Repository-Datei oder ein Preview über seiner Grenze wird mit 413 beantwortet. Sobald der Cache größer als seine Größe ist, werden neue Previews für jede Anfrage konvertiert und nicht gespeichert. Eine fehlgeschlagene Konvertierung wird für die Zeit, die sie gemerkt wird, nicht erneut versucht, bis ein Administrator das Preview aktualisiert. Aktualisieren und das unsichere Preview von E-Mails sind nur für Administratoren."
   text_more_previews_busy:                               "Das Preview wird gerade erzeugt oder der Server ist ausgelastet. Bitte später erneut versuchen."
   text_more_previews_too_large:                          "Die Datei ist zu groß für ein Preview."
+  error_more_previews_invalid_libre_format:              "Ungültiges LibreOffice-Konvertierungsformat; die Einstellungen wurden nicht gespeichert."
   
   label_redmine_more_previews_plugins_settings:            "Plugins Einstellungen"
   
