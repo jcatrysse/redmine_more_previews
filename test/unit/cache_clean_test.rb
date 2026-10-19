@@ -122,6 +122,34 @@ class CacheCleanTest < ActiveSupport::TestCase
     Rake.application = Rake::Application.new
   end
 
+  # upstream cef06a3: DAYS=0 removes every cached preview, only when confirmed
+  def test_rake_task_purges_all_only_when_confirmed
+    rake = Rake::Application.new
+    Rake.application = rake
+    rake.define_task(Rake::Task, :environment)
+    load File.expand_path('../../../lib/tasks/redmine_more_previews.rake', __FILE__)
+    task = rake['redmine_more_previews:cache:clean']
+    RmpCacheClean.expects(:run).never
+    ENV['DAYS'] = '0'
+    error = assert_raises(SystemExit) { capture_io { task.execute } }
+    assert_not error.success?
+    ENV['DAYS'] = '-1'
+    assert_raises(SystemExit) { capture_io { task.execute } }
+    ENV['DAYS'] = '7 days'
+    assert_raises(SystemExit) { capture_io { task.execute } }
+    RmpCacheClean.unstub(:run)
+
+    old = preview('attachments/1/preview.html', 0)
+    ENV['DAYS'] = '0'
+    ENV['CONFIRM_PURGE_ALL'] = '1'
+    assert_output(/1 cached previews removed/) { task.execute }
+    assert_not File.exist?(old)
+  ensure
+    ENV.delete('DAYS')
+    ENV.delete('CONFIRM_PURGE_ALL')
+    Rake.application = Rake::Application.new
+  end
+
   private
 
   # a stored preview, its marker written days ago

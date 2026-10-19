@@ -20,7 +20,7 @@
 #
 
 ja:
-  text_libre_office_available:   "LibreOfficeが利用可能"
+  text_libre_office_available:   "LibreOfficeがサンドボックス（bubblewrap）で利用可能"
   redmine_more_previews:
     libre:
       text_explanation:          "LibreOfficeでオフィスファイルをプレビューする"

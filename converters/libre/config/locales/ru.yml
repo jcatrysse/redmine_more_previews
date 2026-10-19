@@ -20,7 +20,7 @@
 #
 
 ru:
-  text_libre_office_available:   "LibreOffice доступен"
+  text_libre_office_available:   "LibreOffice доступен в своей песочнице (bubblewrap)"
   redmine_more_previews:
     libre:
       text_explanation:          "Предварительный просмотр офисных файлов с помощью LibreOffice"

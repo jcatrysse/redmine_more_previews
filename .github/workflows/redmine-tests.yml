@@ -38,6 +38,8 @@ jobs:
       RMP_DB: ${{ inputs.db }}
       RMP_PROVISION_DB: '0'
       RMP_EXTRA_PLUGINS: ${{ inputs.extra_plugins }}
+      # the Libre sandbox tests fail instead of skipping without bubblewrap (upstream cc7e844)
+      RMP_LIBRE_REQUIRE_SANDBOX: '1'
     steps:
       - uses: actions/checkout@v4
 
@@ -54,8 +56,9 @@ jobs:
           ruby-version: ${{ steps.ruby.outputs.version }}
 
       - name: System libraries
-        # pandoc: the mark converter, used by the plugin's tests
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq libpq-dev default-libmysqlclient-dev pandoc
+        # pandoc: the mark converter, used by the plugin's tests; LibreOffice in its
+        # bubblewrap sandbox and pdfimages: the Libre sandbox tests
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq libpq-dev default-libmysqlclient-dev pandoc libreoffice-writer bubblewrap poppler-utils
 
       - name: Start ${{ inputs.db }}
         run: ./.codex/start_database.sh "${{ inputs.db }}"

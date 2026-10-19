@@ -29,8 +29,9 @@ module RedmineMorePreviews
     # stored preview may contain changes, so that nothing stored before is served.
     # Debug previews stored before showed the converter's instance variables
     # (paths, request, settings) to whoever viewed the preview next (upstream
-    # d704e5d, 35fdcb6, 554a683)
-    CACHE_FORMAT_VERSION = 'debug-redacted-v1'.freeze
+    # d704e5d, 35fdcb6, 554a683); a Libre preview converted before the sandbox
+    # may hold a file of the server a document pointed to (upstream cef06a3)
+    CACHE_FORMAT_VERSION = 'libre-sandbox-v1'.freeze
     SAFE_DEBUG_FIELDS = %w(converter converter_version plugin_version source_type preview_format).freeze
   
     
@@ -549,7 +550,8 @@ module RedmineMorePreviews
         # a requested asset that is missing or not servable must not fall back to the preview
         return nil unless regular_file_within?( dir, assetpath )
         read_limited( assetpath )
-      elsif target && File.exist?(targetpath)
+      elsif target && regular_file_within?( dir, targetpath )
+        # as an asset: a symlink in the cache is not followed (upstream cef06a3)
         read_limited( targetpath )
       else
         nil

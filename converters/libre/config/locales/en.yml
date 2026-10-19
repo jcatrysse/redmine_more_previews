@@ -20,7 +20,7 @@
 #
 
 en:
-  text_libre_office_available:   "LibreOffice available"
+  text_libre_office_available:   "LibreOffice available in its sandbox (bubblewrap)"
   redmine_more_previews:
     libre:
       text_explanation:          "preview office files with LibreOffice"

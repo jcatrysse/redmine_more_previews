@@ -20,7 +20,7 @@
 #
 
 zh:
-  text_libre_office_available:   "可使用LibreOffice"
+  text_libre_office_available:   "可在沙箱（bubblewrap）中使用LibreOffice"
   redmine_more_previews:
     libre:
       text_explanation:          "用LibreOffice预览办公文件"

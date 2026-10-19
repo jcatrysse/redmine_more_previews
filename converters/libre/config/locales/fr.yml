@@ -20,7 +20,7 @@
 #
 
 fr:
-  text_libre_office_available:   "LibreOffice disponible"
+  text_libre_office_available:   "LibreOffice disponible dans son bac à sable (bubblewrap)"
   redmine_more_previews:
     libre:
       text_explanation:          "Prévisualiser les fichiers bureautiques avec LibreOffice"

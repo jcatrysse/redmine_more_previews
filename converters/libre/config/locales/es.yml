@@ -20,7 +20,7 @@
 #
 
 es:
-  text_libre_office_available:   "LibreOffice disponible"
+  text_libre_office_available:   "LibreOffice disponible en su sandbox (bubblewrap)"
   redmine_more_previews:
     libre:
       text_explanation:          "Vista previa de archivos de oficina con LibreOffice"

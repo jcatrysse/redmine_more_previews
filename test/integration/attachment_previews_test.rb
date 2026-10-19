@@ -600,6 +600,26 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  # upstream cef06a3: without a working bubblewrap sandbox Libre converts
+  # nothing, there is no fallback to an unsandboxed LibreOffice
+  def test_libre_without_a_working_sandbox_converts_nothing
+    attachment = preview_attachment(@issue, 'sample.docx')
+    real = File.method(:executable?)
+    File.stubs(:executable?).with { |path| path != Libre::BWRAP_BIN && real.call(path) }.returns(true)
+    File.stubs(:executable?).with(Libre::BWRAP_BIN).returns(false)
+    Libre.any_instance.expects(:command).never
+    with_converters(:libre => { :docx => :pdf }) do
+      log_user('admin', 'admin')
+      get "/attachments/more_preview/#{attachment.id}/index.pdf"
+      assert_response :not_found
+      get '/admin/info'
+      assert_response :success
+      assert_select 'tr', :text => /#{Regexp.escape(I18n.t(:text_libre_office_available))}/ do
+        assert_select 'td.tick span.icon-error'
+      end
+    end
+  end
+
   def test_admin_info_lists_the_converter_checks
     with_converters(CONVERTERS) do
       log_user('admin', 'admin')
