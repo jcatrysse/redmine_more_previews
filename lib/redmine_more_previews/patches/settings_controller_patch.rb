@@ -28,7 +28,7 @@ module RedmineMorePreviews
     module SettingsControllerPatch
       def plugin
         if request.post? && params[:id] == 'redmine_more_previews'
-          formats = params.dig(:settings, :converter, :libre, :mime_types)
+          formats = libre_formats_param
           if formats.present? && !valid_libre_formats?(formats)
             flash[:error] = l(:error_more_previews_invalid_libre_format)
             return redirect_to(plugin_settings_path(params[:id]))
@@ -38,6 +38,16 @@ module RedmineMorePreviews
       end #def
 
       private
+
+      # settings[converter][libre][mime_types], nil if absent; a level that is
+      # no hash (settings=x) gives itself, which is refused as invalid (dig
+      # raised TypeError on a String: HTTP 500, own review)
+      def libre_formats_param
+        [:settings, :converter, :libre, :mime_types].reduce(params) do |level, key|
+          return level unless level.respond_to?(:each_pair)
+          level[key]
+        end
+      end #def
 
       def valid_libre_formats?(formats)
         return false unless formats.respond_to?(:each_pair)

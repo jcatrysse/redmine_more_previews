@@ -72,6 +72,16 @@ class PluginSettingsLibreFormatsTest < Redmine::ControllerTest
     assert_equal @settings, Setting.plugin_redmine_more_previews
   end
 
+  # own review of round 6: a level that is no hash gave HTTP 500
+  def test_malformed_settings_are_refused_not_an_error
+    [{'converter' => 'x'}, {'converter' => {'libre' => 'x'}}, {'converter' => {'libre' => {'mime_types' => 'x'}}}].each do |settings|
+      post :plugin, params: {id: 'redmine_more_previews', settings: settings}
+      assert_response :redirect
+      assert flash[:error].present?, settings.inspect
+      assert_equal @settings, Setting.plugin_redmine_more_previews
+    end
+  end
+
   def test_valid_formats_are_saved
     updated = @settings.deep_dup
     updated['converter']['libre']['mime_types']['docx']['format'] = 'txt'
