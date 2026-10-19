@@ -433,6 +433,20 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  # upstream 2bec017, 9e2c960: the labels of the header box stay on one line
+  # (a German "Betreff" broke over two lines in a 5% wide cell)
+  def test_mail_header_labels_stay_on_one_line
+    attachment = preview_attachment(@issue, 'sample.eml')
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get "/attachments/#{attachment.id}"
+      assert_response :success
+      labels = css_select('#preview_repository_entry_top .box td[style*="font-weight"]')
+      assert_operator labels.size, :>=, 4
+      labels.each { |td| assert_includes td['style'].to_s.delete(' '), 'white-space:nowrap', td.text }
+    end
+  end
+
   def test_plain_text_mail_body_is_escaped
     mail = File.read(File.join(FILES, 'sample.eml')).sub('this is the body', '<b>bold</b> <script>alert(1)</script> this is the body')
     attachment = preview_attachment(@issue, 'tags.eml', mail)
