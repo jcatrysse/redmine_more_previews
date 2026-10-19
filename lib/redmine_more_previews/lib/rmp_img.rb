@@ -51,7 +51,6 @@ module RedmineMorePreviews
             gc.stroke('transparent')
             gc.fill('black')
             gc.strokewidth(1)
-            text = Redmine::Utils::Shell.shell_quote(markup)
             gc << "pango:#{markup}"
             
             gc << img.path
