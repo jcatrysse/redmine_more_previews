@@ -92,4 +92,16 @@ class VinceUriLinkTest < ActiveSupport::TestCase
   ensure
     Rails.logger = logger
   end
+
+  # upstream a3bb8af, e0f27cd: the IMPP field had no label ("Translation missing")
+  def test_impp_has_a_label_in_every_shipped_language
+    %w(de en es fr ja pt pt-BR ru zh).each do |language|
+      with_settings :default_language => language do
+        label = preview('impp', 'xmpp:user@example.invalid').at_css('label')
+        assert_not_nil label, language
+        assert_equal I18n.t(:'vcard.IMPP', :locale => language), label.text.strip, language
+        assert_not_includes label.text.downcase, 'translation missing', language
+      end
+    end
+  end
 end
