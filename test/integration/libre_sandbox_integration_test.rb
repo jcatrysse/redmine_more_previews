@@ -117,6 +117,30 @@ class LibreSandboxIntegrationTest < ActiveSupport::TestCase
     remove_preview_attachments
   end
 
+  # LibreOffice prints the sheet name of a csv, which is the input's file name, as
+  # page header: it showed Redmine's disk name (<timestamp>_sample)
+  def test_csv_preview_has_no_disk_file_name
+    set_tmp_attachments_directory
+    attachment = preview_attachment(Issue.find(1), 'sample.csv')
+    disk_stem = File.basename(attachment.disk_filename, '.csv')
+    assert_match(/\A\d+_sample\z/, disk_stem)
+    with_converters(:libre => { :csv => 'pdf' }) do
+      Setting.clear_cache
+      data = Attachment.find(attachment.id).more_preview(:format => 'pdf')
+      assert data&.start_with?('%PDF-')
+      text = Dir.mktmpdir('rmp-csv') do |dir|
+        pdf = File.join(dir, 'preview.pdf')
+        File.binwrite(pdf, data)
+        Open3.capture2('pdftotext', '-layout', pdf, '-').first
+      end
+      assert_includes text, File.read(File.join(FILES, 'sample.csv')).lines.first.split(',').first.strip
+      assert_not_includes text, disk_stem
+      assert_match(/^\s*sample\s*$/, text)
+    end
+  ensure
+    remove_preview_attachments
+  end
+
   # a conversion that runs out of time is stopped with the sandbox and every
   # LibreOffice process in it (bwrap starts them in a new session)
   def test_sandboxed_conversion_is_stopped_at_the_time_limit

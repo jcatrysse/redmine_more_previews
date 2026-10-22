@@ -29,6 +29,23 @@ class VinceUriLinkTest < ActiveSupport::TestCase
     end
   end
 
+  # URI.split refuses spaces: a phone number written with spaces became an empty value
+  def test_phone_number_with_spaces_is_shown
+    fragment = preview('tel', 'tel:+32 3 123 45 67')
+    assert_includes fragment.text, '+32 3 123 45 67'
+    assert_equal 'tel:+32 3 123 45 67', fragment.at_css('a')['href']
+
+    vcf = "BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Test User\r\nTEL;TYPE=WORK,VOICE:+32 3 123 45 67\r\nEND:VCARD\r\n"
+    card = VinceLib::VObject::Reader.new(object: :vcard, string: vcf).stringall.first
+    assert_includes Nokogiri::HTML.fragment(card.tel.webalize).text, '+32 3 123 45 67'
+  end
+
+  def test_unparseable_value_with_another_scheme_is_never_a_link
+    fragment = preview('url', 'javascript:alert(1) //x')
+    assert_nil fragment.at_css('a')
+    assert_includes fragment.text, 'alert(1) //x'
+  end
+
   def test_geo_has_a_dedicated_google_maps_renderer
     link = preview('geo', 'geo:35.0,139.0').at_css('a')
 

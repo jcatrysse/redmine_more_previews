@@ -100,6 +100,7 @@ en:
     BDAY:                 "Birthday"
     ANNIVERSARY:          "Anniversary"
     ROLE:                 "Role"
+    TITLE:                "Job title"
     PHOTO:                "Photo"
     LOGO:                 "Logo"
     SOURCE:               "Source"

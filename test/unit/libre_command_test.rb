@@ -238,6 +238,23 @@ class LibreCommandTest < ActiveSupport::TestCase
     end
   end
 
+  # LibreOffice prints a csv's sheet name, the input's name, as page header: the
+  # attachment's own name instead of Redmine's disk name
+  def test_input_in_the_sandbox_has_the_attachment_name
+    @worker.preview_format = 'png'
+    @worker.object = {'type' => :attachment, 'object' => Attachment.new(filename: 'Quarter plan (v2).csv')}
+    args = sandbox_args('/redmine/files/2026/10/261019054842_Quarter_plan__v2_.csv')
+    assert_equal '/input/Quarter_plan__v2_.csv', args.last
+    assert_includes args.each_cons(3).to_a, ['--ro-bind', '/redmine/files/2026/10/261019054842_Quarter_plan__v2_.csv', '/input/Quarter_plan__v2_.csv']
+
+    @worker.object = {'type' => :attachment, 'object' => Attachment.new(filename: '../../etc/passwd')}
+    assert_equal '/input/passwd.csv', sandbox_args('/redmine/files/x_passwd.csv').last
+    @worker.object = {'type' => :attachment, 'object' => Attachment.new(filename: 'Überblick.csv')}
+    assert_equal '/input/_berblick.csv', sandbox_args('/redmine/files/123_abc.csv').last
+    @worker.object = {'type' => :attachment, 'object' => Attachment.new(filename: '***.csv')}
+    assert_equal '/input/123_abc.csv', sandbox_args('/redmine/files/123_abc.csv').last
+  end
+
   def test_relative_paths_rejected
     @worker.preview_format = 'pdf'
     assert_raises(RedmineMorePreviews::Exceptions::ConverterBadArgument) do

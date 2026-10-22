@@ -53,7 +53,8 @@ class Libre < RedmineMorePreviews::Conversion
       # what LibreOffice wrote is untrusted: no symlink or hard link is followed,
       # renamed or copied into the cache
       validate_libre_output!
-      generated = File.join(tmpdir, outfile)
+      # LibreOffice names its output after the input inside the sandbox
+      generated = File.join(tmpdir, File.basename(sandbox_input_name(source), '.*') + ".#{preview_format}")
       raise ConverterShellError, 'LibreOffice output is missing' unless File.file?(generated)
       File.rename(generated, tmptarget) unless generated == tmptarget
     end
@@ -111,6 +112,21 @@ class Libre < RedmineMorePreviews::Conversion
   end #def
   private :validate_libre_output!
   
+  # LibreOffice names a spreadsheet's sheet after the input file and prints the
+  # sheet name as the page header (pdf, png, jpg of a csv). Inside the sandbox the
+  # input gets the attachment's or repository file's own name (sample.csv), not
+  # Redmine's disk name (261019054842_sample.csv); only the characters Redmine
+  # keeps in a disk name, the extension of the file on disk
+  def sandbox_input_name( src )
+    original = if object.is_a?(Hash)
+                 object['type'] == :attachment ? object['object'].try(:filename) : object['path']
+               end
+    stem = File.basename(original.to_s, File.extname(original.to_s)).gsub(/[^a-zA-Z0-9_\-]/, '_')[0, 100]
+    stem = File.basename(src, File.extname(src)) if stem.delete('_').empty?
+    stem + File.extname(src)
+  end #def
+  private :sandbox_input_name
+  
   def soffice( src, user_installation )
     # the format comes from the plugin settings, which an administrator edits:
     # checked before it goes into the shell command, and quoted
@@ -128,7 +144,7 @@ class Libre < RedmineMorePreviews::Conversion
       raise ConverterBadArgument, 'LibreOffice sandbox requires absolute paths'
     end
     
-    input_name = File.basename(src)
+    input_name = sandbox_input_name(src)
     profile_host_dir = File.dirname(user_installation)
     if input_name == '.' || input_name == '..' || src == '/' ||
        tmpdir == '/' || profile_host_dir == '/'

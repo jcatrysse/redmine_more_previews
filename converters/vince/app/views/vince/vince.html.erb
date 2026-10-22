@@ -45,8 +45,8 @@
         
         <div class="splitcontentleft">
           <h4><%= I18n.with_locale(Setting.default_language){I18n.translate(:"vcard.personal" )} %></h4>
-          <%= vcf.select(:org, :n, :nickname, :gender, :bday, :anniversary, :lang).
-                webalize(fields:[:org, :n, :nickname, :gender, :bday, :anniversary, :lang], iconize: @iconize) %>
+          <%= vcf.select(:org, :title, :role, :n, :nickname, :gender, :bday, :anniversary, :lang).
+                webalize(fields:[:org, :title, :role, :n, :nickname, :gender, :bday, :anniversary, :lang], iconize: @iconize) %>
         </div>
         
         <div class="splitcontentright">

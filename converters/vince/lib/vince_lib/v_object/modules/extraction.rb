@@ -122,7 +122,11 @@ module VObject
           begin
             URI.split(val[0].to_s) + [get_uri(*val, **att).to_s]
           rescue URI::InvalidURIError
-            ["", "", "", "", "", "", "", "", ""] + [get_uri(*val, **att).to_s]
+            # a value URI cannot split, such as a phone number with spaces ("tel:+32 3 123 45 67"
+            # or "+32 3 123 45 67"), keeps its text and scheme instead of becoming empty
+            raw = val[0].to_s
+            scheme, opaque = raw.match(/\A([a-z][a-z0-9+.\-]*):(.*)\z/im)&.captures
+            [scheme.to_s, "", "", "", "", opaque.to_s, opaque.to_s, "", ""] + [raw]
           end
         ].transpose.to_h
       end #def

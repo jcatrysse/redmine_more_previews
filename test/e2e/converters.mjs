@@ -57,6 +57,12 @@ for (const [name, format, type, needle, caption, allow] of cases) {
   await t.shot(name.replace('.', '-'), caption, { full: false });
 }
 
+// Vince shows the job title and a phone number written with spaces (both were missing)
+const vcard = (await (await t.page.request.get(`${t.BASE}/attachments/more_preview/${att['sample.vcf']}/index.html`)).body()).toString('utf8');
+for (const needle of ['+32 9 123 45 67', 'Engineer', 'Job title']) {
+  if (!vcard.includes(needle)) t.problems.push(`sample.vcf: preview lacks "${needle}"`);
+}
+
 // navigation between the attachments of the issue
 await t.go(`/attachments/${att['sample.md']}`);
 await t.page.click('.pagination.filepreview a:has-text("Next »")');

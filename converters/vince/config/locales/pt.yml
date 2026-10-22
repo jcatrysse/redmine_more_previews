@@ -100,6 +100,7 @@ pt:
     BDAY:                 "Aniversário"
     ANNIVERSARY:          "Aniversário"
     ROLE:                 "Papel"
+    TITLE:                "Cargo"
     PHOTO:                "Foto"
     LOGO:                 "Logotipo"
     SOURCE:               "Fonte"

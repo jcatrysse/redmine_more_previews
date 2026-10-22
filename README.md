@@ -115,6 +115,16 @@ to install necessary gems. Install LibreOfiice (for Libre) and/or Pandoc for (fo
 
 ### Use
 
+Nothing is previewed until these three are set:
+
+1. **The converters** (Administration > Plugins > Redmine More Previews > Configure): the sub plugin is
+   activated and the file extension is ticked for it, see below. Its external program must be installed
+   (for example LibreOffice and bubblewrap for Libre); Administration > Information shows which are.
+2. **The project module** "Redmine More Previews" in Project > Settings > Modules, per project.
+3. **The right to see the file**: the role's core permission for where the file is (view issues for an
+   issue attachment, view documents, view files, browse repository). The plugin's own permission
+   ("Use Redmine More Previews") is public: every role has it, there is nothing to tick.
+
 * Go to Administration -> Plugins -> Redmine More Previews Configuration 
 
 Choose the following options
