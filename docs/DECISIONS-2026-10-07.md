@@ -174,3 +174,30 @@ a server needs (upstream 854355f) and a schedule for the cache rake task. Push
 after every commit. End with a short report in Dutch. These decisions are final;
 do not stop to ask about them. If a part turns out impossible on our code base,
 write down why in the plan and carry on with the rest.
+
+## Round 7, 2026-10-29: curecodejp/redmine_more_previews v6.1.4
+
+Jan decided (2026-10-29, through the coordinator session) to port the fixes of
+https://github.com/curecodejp/redmine_more_previews tag v6.1.4 (17 commits after
+v6.1.3, no merges; release note:
+https://github.com/HugoHasenbein/redmine_more_previews/issues/123#issuecomment-6507175850)
+to `redmine70-migration`:
+
+- PORT: 55ecdb5 (Vince `array_minus`), fc40099 (Vince humanize arity),
+  df0c1cf (Maggie: no PDF copied under an image name without Ghostscript; keep
+  our `Redmine::Thumbnail.valid_pdf_magic?` call), d6f69b2 and b46f4c1 (Vince
+  vCard 3.0 inline image MIME types from a whitelist, PHOTO and LOGO), 0042aad
+  (cache invalidation: a new `CACHE_FORMAT_VERSION` of ours), de99ca8 (CI: the
+  bubblewrap user-namespace fix on the Ubuntu 24.04 runner; workflow stays
+  manual, inputs through `env:`), the tests of 24b5025, e89952d, a507222, 685b348
+  and c4535e8 where they cover code we have.
+- Libre image links for non-ASCII file names: "take it". Port upstream 43a7eec,
+  then 6b15276 and fa1fbca, fitted to the sandboxed Libre flow (on the output in
+  our tmpdir, after conversion, without widening the sandbox), proven with a
+  docx named for example `Offerte_Réunion 2026.docx` with an image, HTML output,
+  in the browser.
+- DO NOT PORT: ce8114e (upstream release preparation and version), 719924a and
+  11d1528 (removal of the obsolete jp locales: no functional effect, and a
+  minimal diff).
+
+Built: see "Round 7" in docs/REDMINE7-MIGRATION.md.

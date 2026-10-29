@@ -20,7 +20,7 @@ what is left. Written 2026-10-06 from a measured analysis (report at the bottom)
 | Upstream | HugoHasenbein/redmine_more_previews main @ 0bca937b36c56e3114e582b9bdf3384814d394ca (2025-02-13, 5.0.9) |
 | Runs on Redmine 7 as is | NEE (boot) |
 | Runs on Redmine 7 after this branch | JA: tests and e2e green on PostgreSQL 16 (see "Results"); also with the other GEOxyz plugins, apart from their own defects listed there |
-| Migration session | done 2026-10-06; Jan's decisions of 2026-10-07, round 4 (2026-10-11), round 5 (2026-10-12, security fixes of curecodejp 6.1.2: conversion limits, Vince) and round 6 (2026-10-19, curecodejp 6.1.3: Libre in a bubblewrap sandbox, debug redaction, module off, Cliff 413, repository cache removal) built (see "Decided by Jan") |
+| Migration session | done 2026-10-06; Jan's decisions of 2026-10-07, round 4 (2026-10-11), round 5 (2026-10-12, security fixes of curecodejp 6.1.2: conversion limits, Vince) round 6 (2026-10-19, curecodejp 6.1.3: Libre in a bubblewrap sandbox, debug redaction, module off, Cliff 413, repository cache removal) and round 7 (2026-10-29, curecodejp 6.1.4: Vince, Maggie without Ghostscript, Libre image links, cache format) built (see "Decided by Jan") |
 | Upstream sync | UPSTREAM DOOD: nothing upstream; fork already equals upstream 5.0.9 + 2 own commits; claude/redmine7-rails8-compat 4eb8dea cherry-picked |
 | After sync | n.v.t. |
 | Complexity (1 trivial .. 5 rewrite) | 3 |
@@ -135,6 +135,8 @@ These GEOxyz commits are on the branch GEOxyz runs today and therefore on this b
 | same, with the 37 other GEOxyz plugins (heads of 2026-10-12) | PostgreSQL 16.15 | 252 runs, 1457 assertions, 0 failures, 0 errors, 0 skips |
 | 7.0-stable-GEOxyz (7.0.2), before round 6 (`8202ac6`, no Ghostscript then) | PostgreSQL 16 | 252 runs, 1452 assertions, 0 failures, 0 errors, 2 skips |
 | 7.0-stable-GEOxyz (7.0.2), after round 6 (`fe0ca79`), `RMP_LIBRE_REQUIRE_SANDBOX=1` (the real sandbox tests ran) | PostgreSQL 16 | 331 runs, 2095 assertions, 0 failures, 0 errors, 0 skips |
+| 7.0-stable-GEOxyz (`578730a`), before round 7 (`4990f70`), `RMP_LIBRE_REQUIRE_SANDBOX=1`, no Ghostscript | PostgreSQL 16.15 | 336 runs, 2122 assertions, 0 failures, 0 errors, 2 skips (Ghostscript) |
+| 7.0-stable-GEOxyz (`578730a`), after round 7 (`71d755f`), `RMP_LIBRE_REQUIRE_SANDBOX=1`, no Ghostscript; seeds 28664 and 27367 | PostgreSQL 16.15 | 365 runs, 2307 assertions, 0 failures, 0 errors, 2 skips (Ghostscript) |
 | (former, 5.1 no longer required) 5.1-stable, Ruby 3.2.6, at `c19f76f` | PostgreSQL 16 | 46 runs, 361 assertions, 0 failures, 0 errors, 0 skips |
 
 Boot and production eager load: OK (the e2e server runs in production mode). Migrations: the plugin
@@ -149,7 +151,8 @@ has none.
 | MariaDB + 3 other GEOxyz plugins (not committed) | 15 | 6 | 8 scripts, 46 screenshots | 0 |
 | PostgreSQL 16 after Jan's decisions (`docs/e2e/`, replaces the run above) | 15 | 6 | 9 scripts, 62 screenshots | 0 |
 | PostgreSQL 16 after round 5 (`docs/e2e/`, current) | 15 | 6 | 13 scripts, 89 screenshots (helpdesk_mail checks nothing without the helpdesk) | 0 |
-| PostgreSQL 16 after round 6 (`docs/e2e/`, current; the scenarios touched by the review fixes run again on the final code) | 16 | 6 | 21 scripts, 135 screenshots | 0 |
+| PostgreSQL 16 after round 7 (`docs/e2e/`, current; maggie with Ghostscript installed, round7 without) | 16 | 6 | 21 scripts, 121 screenshots | 0 (maggie without Ghostscript: 4, the correct 404 for sample.pdf to png) |
+| PostgreSQL 16 after round 6 (`docs/e2e/`, replaced by the run above; the scenarios touched by the review fixes run again on the final code) | 16 | 6 | 21 scripts, 135 screenshots | 0 |
 | PostgreSQL 16 with all 37 other GEOxyz plugins, round 5 (`docs/e2e/combined/`, current) | 16 | 6 | 13 scripts, 93 screenshots | 1, not from this plugin (redmine_view_issue_description's 403) |
 | PostgreSQL 16 after round 4 | 15 | 6 | 11 scripts, 77 screenshots | 0 |
 | PostgreSQL 16 with all 37 other GEOxyz plugins, round 4 | 16 | 6 | 11 scripts, 77 screenshots | 1, not from this plugin (redmine_view_issue_description's 403) |
@@ -221,6 +224,7 @@ migration sessions; this plugin's scenarios pass there):
 | Vince IMPP label and photo alt text, Cliff labels on one line (German), "-draft.md", an attachment missing on disk answered 404 (round 6) | attachment | round6_files | round6_files-*.png |
 | Emails beyond Cliff's limits: 413 with the reason, a warning on the page (round 6) | attachment | limits | limits-emails-refused, limits-nested-page |
 | Purge of all stored previews `cache:clean DAYS=0 CONFIRM_PURGE_ALL=1` (round 6) | rake, once after the upgrade | cache_purge | cache_purge-rake |
+| vCard 3.0 PHOTO/LOGO as HTML (image/jpeg, image/png) and as text; a PDF by Maggie without Ghostscript gives no preview; Libre HTML with an image for "Offerte_Réunion 2026.docx" and a repository "docs/会議録.docx"; as reporter too (round 7) | attachment, repository entry | round7 | round7-*.png |
 | REST API, mail in/out | the plugin has none | - | - |
 
 ### Reviews
@@ -248,6 +252,12 @@ migration sessions; this plugin's scenarios pass there):
 - Round 6: OpenAI review (gpt-5) of `8202ac6..592dbc9`, `docs/reviews/openai-2026-10-19-592dbc9.md`: 1
   finding (an "undefined `now`" in RmpProcess.fork), not a defect (`RmpProcess.now`, unchanged since
   round 5), resolution recorded there.
+
+- Round 7 (2026-10-29): own review of `4990f70..71d755f`: no defect found. Recorded, not changed: a
+  vCard 3.0 `TYPE=image/jpeg` (a full MIME type instead of the image name) now gets
+  `application/octet-stream`, as upstream (the old code built `image/image/jpeg`, not shown either).
+- Round 7: OpenAI review (gpt-5) of `4990f70..71d755f`, `docs/reviews/openai-2026-10-29-71d755f.md`:
+  no findings.
 
 ### Not tested here (needs production or is out of reach)
 
@@ -320,9 +330,8 @@ in each commit):
 Known limitations, not defects (recorded with Jan's round-4 decision): a repository without
 revisions (Filesystem) or without fetched changesets can keep a stale preview, because the cache key
 then falls back to the requested revision; the 5.1 cache below `repository/` stays on disk, unread
-(removed once after the upgrade, see there). Maggie without Ghostscript copies a valid PDF under the
-image name (pre-existing, upstream does the same; the response is sandboxed): GEOxyz installs
-Ghostscript, and Maggie is off after the hand-over task.
+(removed once after the upgrade, see there). Maggie without Ghostscript copied a valid PDF under the
+image name (pre-existing, upstream did the same): fixed in round 7 (`191b0c3`, upstream df0c1cf).
 
 **Round 5, 2026-10-12: security fixes of curecodejp/redmine_more_previews v6.1.2** (Jan's decision in
 `docs/DECISIONS-2026-10-07.md`, section "Round 5"; ported by hand in upstream's order, the upstream
@@ -512,6 +521,65 @@ Upstream commits v6.1.2..v6.1.3 (69, no merges), verdict per commit:
 | 2fb03f3 | docs: align Japanese NilText warning for 6.1.3 | ported `6444bed` |
 | 9c725be | docs: finalize 6.1.3 changelog heading for release | not needed: changelog heading |
 
+**Round 7, 2026-10-29: curecodejp/redmine_more_previews v6.1.4** (maintenance release, tag v6.1.4).
+Jan, 2026-10-29 (coordinator session; `docs/DECISIONS-2026-10-07.md`, "Round 7"): port the 6.1.4
+fixes, the workflow fix and the Libre image-link fix; not the release preparation and not the jp
+locale removal. Ported by hand, each commit names the upstream commits ("port of curecodejp
+<sha>"); every fix has a test that fails without it, seen by running the new tests on the old code
+(listed per commit).
+
+| commit here | what | tests, red on the old code |
+|---|---|---|
+| `a57748f` | Vince `array_minus`: `arr -= [[k2,v2]]` (names defined only in the Regexp branch) raised NameError for a plain value. Latent: no template calls `select_by_all_attributes` / `unselect_by_all_attributes` | vince_filters_test (upstream's): 3 errors (NameError `k2`) |
+| `a7e2e24` | Vince humanize procs called with one argument (`iconize` undefined in the 5 humanize methods). Latent in the preview: `vince.txt.erb` renders no PHOTO/LOGO; the e2e text preview of a card with both is 200 before and after | vince_humanize_test (upstream's): 6 errors (NameError `iconize`) |
+| `191b0c3` | Maggie: without Ghostscript no preview, no longer the PDF copied to `index.png/jpg/gif`; our `Redmine::Thumbnail.valid_pdf_magic?` call and comment kept | maggie_test: on the old code `index.png` holds the PDF (1 failure); e2e: HTTP 200 `%PDF-` as png before, 404 after |
+| `7bed2dc` | Vince vCard 3.0 inline PHOTO/LOGO: MIME type from a whitelist (whole TYPE, quotes and case aside), else `application/octet-stream`. Hardening, not an XSS fix: `tag(:img, src:)` already escapes the attribute (checked on the old code: `png<script>` and `" onerror=` come out as `&lt;` and `&quot;`) | vince_uri_image_test (upstream's incl. 24b5025): 4 failures (`data:image/jpg`, `data:image/notpng`); e2e: `data:image/JPEG` before |
+| `c7b0bdd` | test only: nested repository asset paths (our code since `f4fef30`, round 6) | repository_nested_asset_test (upstream's): green on the old code, as expected |
+| `bc4e935` | Libre `fix_image_path` (43a7eec, 6b15276, fa1fbca): on the host after soffice has exited, on the output in our tmpdir, between two `validate_libre_output!` calls, read and written as bytes; the sandbox is unchanged. See the finding below | libre_image_path_test (upstream's + LibreOffice's own double encoding): 8 errors; real sandbox with `LANG=C`: 1 error (precondition: link `%C3%A4%C2%BC%C2%9A...` seen) |
+| `83d3077` | cache format `converter-fixes-v1` (ours; upstream `maintenance-6.1.4-v1`): previews stored before are converted again, the ETag changes with it | conversion_debug_redaction_test: a preview marked `pass:libre-sandbox-v1:normal` served as stored on the old code (1 failure) |
+| `06860ad` | workflow: `kernel.apparmor_restrict_unprivileged_userns=0` on the disposable Ubuntu 24.04 runner, so the Libre sandbox tests (`RMP_LIBRE_REQUIRE_SANDBOX=1`) can run. Still `workflow_dispatch` only, no inputs in the step. Not run on GitHub: the workflow is only on this branch, so Actions has no run of it | - |
+| `7df4b27` | found while proving round 7: repository asset after the slash of the preview URL. The route captures `.../preview/<file>@/<asset>` with the slash (`"/<asset>"`), and since `74f59fc` (round 5, port of upstream 32b9e77) `safe_relative_path` refused it as absolute: every image of a repository HTML preview answered 404 (upstream 6.1.4 has the same code). The route's one slash dropped; absolute and `..` paths still refused | repository_previews_test: 404 on the old code (1 failure); e2e: the image of `docs/会議録.docx` broken before, shown after |
+| `71d755f` | test only: the ETag test of round 6 failed with seed 28664. `Setting.plugin_...=` clears Redmine's settings cache under the symbol, `Converter.debug?` reads the string key; a request clears the whole cache only if `updated_on` (whole seconds) is not before the last clear. `Setting.clear_cache` after the switch; assertions unchanged | the same test, seed 28664: red before, green after |
+| `3baf452` | e2e `round7.mjs` and a full run | 5 problems on the old code, 0 after |
+
+Libre image links, measured (LibreOffice 24.2.7.2, bubblewrap 0.9.0): LibreOffice writes the image
+links of a non-ASCII output name encoded twice only **without a UTF-8 locale** (`LANG=C`/`POSIX`:
+`Offerte_R%C3%83%C2%A9union%202026_html_*.png`; `LANG=C.UTF-8`: `Offerte_R%C3%A9union%202026_html_*.png`,
+correct). Our sandbox sets `LANG=C.UTF-8`, and an attachment's name is made ASCII inside it since
+#25077 (`Offerte_R_union_2026.docx`). So on this branch the links were already right;
+`fix_image_path` rewrites them to the same value and guards a host whose sandbox has no C.UTF-8
+locale (glibc falls back to C). Proven in the browser: "Offerte_Réunion 2026.docx" (attachment)
+and "docs/会議録.docx" (repository; a name without ASCII letters keeps it in the sandbox) as HTML,
+the image shown (`round7-libre-attachment.png`, `round7-libre-repository.png`); the repository one
+needed `7df4b27`.
+
+Upstream commits v6.1.3..v6.1.4 (17, no merges), verdict per commit:
+
+| upstream | subject | verdict |
+|---|---|---|
+| de99ca8 | CI: allow bubblewrap user namespaces on Ubuntu 24.04 runner | ported `06860ad` (our manual workflow) |
+| 55ecdb5 | Fix Vince array_minus for normal attribute pairs | ported `a57748f` |
+| fc40099 | Fix Vince humanize callback arity for text rendering | ported `a7e2e24` |
+| df0c1cf | Fix Maggie PDF previews without Ghostscript | ported `191b0c3` (our `Redmine::Thumbnail.valid_pdf_magic?` kept) |
+| d6f69b2 | Normalize Vince legacy inline image MIME types | ported `7bed2dc` |
+| 6b15276 | Preserve dotted non-ASCII basenames in Libre HTML image links | ported `bc4e935`, on top of 43a7eec (2023, never on this branch) |
+| b46f4c1 | Address review feedback and consolidate tests (Vince quoted TYPE) | ported `7bed2dc` |
+| 24b5025 | Address review feedback and consolidate tests (Vince tests) | tests ported `7bed2dc` |
+| fa1fbca | Address review feedback and consolidate tests (Libre `[A-Za-z%\d_.-]`, `ERB::Util.url_encode`) | ported `bc4e935` |
+| 685b348 | Address review feedback and consolidate tests (Libre tests) | tests ported `bc4e935` (`send`: our `fix_image_path` is private) |
+| c4535e8 | Fix Libre image path regression test syntax | ported `bc4e935` (the fixed form) |
+| e89952d | test: cover nested repository asset paths | ported `c7b0bdd` |
+| 719924a | chore: remove obsolete jp locale in favor of ja | not ported (Jan): no functional effect, minimal diff |
+| a507222 | test: initialize Repository before Mocha stubbing | ported `c7b0bdd` (`Repository.new`) |
+| 11d1528 | Remove obsolete jp locales from all converters | not ported (Jan), as 719924a |
+| ce8114e | Prepare Redmine More Previews 6.1.4 maintenance release | not ported (Jan): upstream version and changelog |
+| 0042aad | Invalidate pre-6.1.4 preview caches for converter fixes | ported `83d3077` (own value `converter-fixes-v1`) |
+
+Upstream's intermediate fixes of `fix_image_path` (0f53066, 16b693a, 3515ea4, #19153) are contained
+in the final form ported. Found, not changed: Vince reads a vCard line of more than `LINE_LENGTH`
+bytes in pieces, so an unfolded inline photo (not allowed by RFC 6350, which folds at 75 octets) is
+cut and not shown; the e2e card is folded.
+
 ## After the upgrade (production)
 
 Actions the person doing the upgrade must take, or know about, for this plugin:
@@ -533,6 +601,8 @@ Actions the person doing the upgrade must take, or know about, for this plugin:
   ImageMagick's `policy.xml` the coders PS, PS2, PS3, EPS, EPI, EPSI, EPSF, MVG, MSL, TEXT, URL, HTTP,
   HTTPS and FTP disabled (from curecodejp's README; they do not stop PostScript reaching Ghostscript
   through the PDF coder, which Maggie's start-of-file check does).
+- Round 7 changed the cache format (`converter-fixes-v1`): previews stored before are converted
+  again on their next view; the old files stay on disk until the purge below or the daily clean.
 - Empty the preview cache once after deploying: `rm -rf <redmine>/tmp/more_previews/*`, or since
   round 6 the rake task with `DAYS=0 CONFIRM_PURGE_ALL=1` (below). Cached zip
   tables from before still carry the double-encoded links, and repository previews moved to a new
