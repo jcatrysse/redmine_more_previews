@@ -64,6 +64,30 @@ class VinceUriImageTest < ActiveSupport::TestCase
       assert_includes html, %(alt="#{I18n.with_locale(Setting.default_language) { I18n.t(:"vcard.#{field.upcase}") }}")
     end
 
+    # port of curecodejp d6f69b2, b46f4c1, 24b5025: the MIME type of a vCard 3.0
+    # inline image comes from a fixed list, no longer "image/" + the card's TYPE
+    define_method("test_#{field}_vcard3_inline_type_is_canonicalized") do
+      {'jpg' => 'image/jpeg', 'JPEG' => 'image/jpeg', 'PnG' => 'image/png',
+       'gif' => 'image/gif', 'bmp' => 'image/bmp', 'TIFF' => 'image/tiff',
+       'SVG+XML' => 'image/svg+xml', '"JPEG"' => 'image/jpeg'}.each do |type, expected_mime|
+        html = Array(card("#{field.upcase};ENCODING=b;TYPE=#{type}:#{PNG_BASE64}", version: '3.0').
+                     public_send(field).webalize).join
+
+        assert_includes html, "src=\"data:#{expected_mime};base64,#{PNG_BASE64}\"", type
+      end
+    end
+
+    define_method("test_#{field}_vcard3_unrecognized_inline_type_is_not_used_as_mime") do
+      ['notpng', 'jpg-extra', 'svg+xml-evil', 'png<script', 'jpeg2000'].each do |type|
+        html = Array(card("#{field.upcase};ENCODING=b;TYPE=#{type}:#{PNG_BASE64}", version: '3.0').
+                     public_send(field).webalize).join
+
+        assert_includes html, "src=\"data:application/octet-stream;base64,#{PNG_BASE64}\"", type
+        assert_not_includes html, "data:image/#{type}", type
+        assert_not_includes html, '<script', type
+      end
+    end
+
     define_method("test_#{field}_vcard3_inline_base64_is_kept") do
       html = Array(card("#{field.upcase};ENCODING=b;TYPE=png:#{PNG_BASE64}", version: '3.0').send(field).webalize).join
 
