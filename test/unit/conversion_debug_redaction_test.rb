@@ -150,6 +150,17 @@ class ConversionDebugRedactionTest < ActiveSupport::TestCase
     assert_equal safe_result, File.read(@target)
   end
 
+  # round 7 (curecodejp 6.1.4, 0042aad): a preview stored with the marker of
+  # round 6 is converted again (a Maggie PDF stored as png, Vince's MIME types)
+  def test_cached_output_from_round_6_is_rebuilt
+    FileUtils.mkdir_p(File.dirname(@target))
+    File.write(@target, 'STALE ROUND 6 PREVIEW')
+    File.write("#{File.dirname(@target)}.converter", 'pass:libre-sandbox-v1:normal')
+
+    assert_equal 'source data', pass_worker.preview(File.new(@source))
+    assert_equal 'pass:converter-fixes-v1:normal', File.read("#{File.dirname(@target)}.converter")
+  end
+
   def test_switching_debug_mode_regenerates_the_cached_preview
     RedmineMorePreviews::Converter.stubs(:debug?).returns(true)
     diagnostic = pass_worker.preview(File.new(@source))

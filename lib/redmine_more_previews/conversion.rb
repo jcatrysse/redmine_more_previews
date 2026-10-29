@@ -30,8 +30,10 @@ module RedmineMorePreviews
     # Debug previews stored before showed the converter's instance variables
     # (paths, request, settings) to whoever viewed the preview next (upstream
     # d704e5d, 35fdcb6, 554a683); a Libre preview converted before the sandbox
-    # may hold a file of the server a document pointed to (upstream cef06a3)
-    CACHE_FORMAT_VERSION = 'libre-sandbox-v1'.freeze
+    # may hold a file of the server a document pointed to (upstream cef06a3).
+    # Round 7 (upstream 0042aad): Maggie stored a PDF as png/jpg/gif without
+    # Ghostscript, Vince's inline image types and Libre's image links changed
+    CACHE_FORMAT_VERSION = 'converter-fixes-v1'.freeze
     SAFE_DEBUG_FIELDS = %w(converter converter_version plugin_version source_type preview_format).freeze
   
     
