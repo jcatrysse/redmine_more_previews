@@ -54,12 +54,10 @@ class Maggie < RedmineMorePreviews::Conversion
     when "application/pdf"
       # Ghostscript runs a file as PostScript unless it starts as a PDF, whatever coder
       # ImageMagick asks for; Marcel reports PDF when %PDF- appears near the start
-      if !Redmine::Thumbnail.valid_pdf_magic?(source)
-        nil
-      elsif Redmine::Thumbnail.gs_available?
+      # without Ghostscript a PDF cannot be rasterized: no preview, never the PDF
+      # itself under the image's name (port of curecodejp df0c1cf)
+      if Redmine::Thumbnail.valid_pdf_magic?(source) && Redmine::Thumbnail.gs_available?
         "#{convert_command} -density #{get_density} #{shell_quote "pdf:#{source}[0]"} #{shell_quote "#{preview_format}:#{output}"}"
-      else
-        copy( source, output )
       end
     end
     command( cd + join + cmd + join + move(output)) if cmd

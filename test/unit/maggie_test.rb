@@ -48,6 +48,30 @@ class MaggieTest < ActiveSupport::TestCase
     end
   end
 
+  # port of curecodejp df0c1cf: without Ghostscript a PDF was copied under the
+  # image name (index.png holding a PDF); now there is no preview
+  def test_pdf_without_ghostscript_is_not_copied_as_an_image
+    Redmine::Thumbnail.stubs(:gs_available?).returns(false)
+    %w(png jpg gif).each do |format|
+      Dir.mktmpdir do |dir|
+        path = File.join(dir, 'doc.pdf')
+        File.binwrite(path, PDF)
+        target = File.join(dir, 'preview', "index.#{format}")
+        worker = RedmineMorePreviews::Converter.find(:maggie).worker(:target => target, :preview_format => format)
+        assert_nil worker.preview(File.new(path)), "#{format}: no preview"
+        assert_not File.exist?(target), "#{format}: no PDF stored as index.#{format}"
+      end
+    end
+  end
+
+  def test_images_do_not_need_ghostscript
+    Redmine::Thumbnail.stubs(:gs_available?).returns(false)
+    png = File.binread(File.join(RedmineMorePreviews::TestHelper::FILES, 'sample.png'))
+    cmd = commands_for('picture.png', png).join
+    assert_include "'png:", cmd
+    assert_include "'png:./out.png'", cmd
+  end
+
   def test_images_are_read_with_their_coder_and_imagemagick_is_bounded
     png = File.binread(File.join(RedmineMorePreviews::TestHelper::FILES, 'sample.png'))
     cmd = commands_for('picture.png', png, :format => 'jpg').join
