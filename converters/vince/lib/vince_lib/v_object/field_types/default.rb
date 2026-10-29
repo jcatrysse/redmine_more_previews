@@ -127,7 +127,7 @@ module VObject
         to_h[name].map do |hash| 
           [ "#{translate(:"#{parent_class_symbol}.#{name.to_s.upcase}")}:",
             if humanize_proc.is_a?(Proc)
-              humanize_proc.call(hash,iconize)
+              humanize_proc.call(hash)
             else
               hash[:fields].map{|field, value| "  #{translate(:"#{parent_class_symbol}.#{name.to_s.upcase}_FIELD.#{field}")}:".ljust(LABEL_WIDTH) + "#{value}"}
             end
@@ -165,7 +165,7 @@ module VObject
         to_h[name].map do |hash| 
           [ "#{translate(:"#{parent_class_symbol}.#{name.to_s.upcase}")}:",
             if humanize_proc.is_a?(Proc)
-              humanize_proc.call(hash,iconize)
+              humanize_proc.call(hash)
             else
               hash[:fields].map{|field, value| "".ljust(LABEL_WIDTH) + "#{value}"}
             end
@@ -203,7 +203,7 @@ module VObject
         to_h[name].map do |hash|
           [  "#{translate(:"#{parent_class_symbol}.#{name.to_s.upcase}")}:".ljust(LABEL_WIDTH),
             if humanize_proc.is_a?(Proc)
-              humanize_proc.call(hash,iconize)
+              humanize_proc.call(hash)
             else
               "#{hash[:value]}"
             end
@@ -237,7 +237,7 @@ module VObject
         to_h[name].map do |hash| 
            [ "#{translate(:"#{parent_class_symbol}.#{name.to_s.upcase}")}:".ljust(LABEL_WIDTH),
              if humanize_proc.is_a?(Proc)
-               humanize_proc.call(hash,iconize)
+               humanize_proc.call(hash)
              else
                "#{translate(:"#{parent_class_symbol}.#{name.to_s.upcase}_VALUE.#{hash[:symbol]}", :default => hash[:symbol])}"
              end
@@ -315,7 +315,7 @@ module VObject
         to_h[name].map do |hash|
           [ "#{translate(:"#{parent_class_symbol}.#{name.to_s.upcase}")}:".ljust(LABEL_WIDTH),
             if humanize_proc.is_a?(Proc)
-              humanize_proc.call(hash,iconize)
+              humanize_proc.call(hash)
             else
               hash[:fields][:full]
             end
