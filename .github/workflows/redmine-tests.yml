@@ -61,6 +61,20 @@ jobs:
         # bubblewrap sandbox and pdfimages: the Libre sandbox tests
         run: sudo apt-get update -qq && sudo apt-get install -y -qq libpq-dev default-libmysqlclient-dev pandoc libreoffice-writer bubblewrap poppler-utils
 
+      - name: Allow bubblewrap user namespaces on this runner
+        # Ubuntu 24.04's AppArmor forbids unprivileged user namespaces, so bwrap
+        # cannot start the sandbox. Changed on this disposable runner only; the
+        # plugin still refuses Libre without a working sandbox (upstream de99ca8)
+        run: |
+          if [ -f /proc/sys/kernel/apparmor_restrict_unprivileged_userns ]; then
+            current=$(cat /proc/sys/kernel/apparmor_restrict_unprivileged_userns)
+            echo "AppArmor restrict_unprivileged_userns: $current"
+            if [ "$current" = "1" ]; then
+              sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+            fi
+          fi
+          bwrap --version
+
       - name: Start ${{ inputs.db }}
         run: ./.codex/start_database.sh "$RMP_DB"
 
