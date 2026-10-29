@@ -155,7 +155,9 @@ module RedmineMorePreviews
             @asset = params[:asset].is_a?(Array) ? params[:asset].join('/') : params[:asset]
             @asset = [@asset, params[:assetformat]].compact.join(".").presence
             return if @asset.nil?
-            @asset = RedmineMorePreviews::Lib::RmpFile.safe_relative_path(@asset)
+            # a relative link in a preview served at ...@/index.html asks for
+            # ...@/<asset>: that one slash belongs to the route
+            @asset = RedmineMorePreviews::Lib::RmpFile.safe_relative_path(@asset.delete_prefix("/"))
             # the format of the preview as Repository#preview_format finds it, from
             # the entry's name, without asking the SCM for the entry
             extension = File.extname(@path.to_s)[1..].to_s.downcase

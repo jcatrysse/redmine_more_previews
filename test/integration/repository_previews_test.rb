@@ -245,6 +245,28 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  # a relative link in a preview served at ...@/index.html (the images of a Libre
+  # HTML preview) asks for ...@/<asset>: the slash after @ is part of the route,
+  # not an absolute path (404 since 74f59fc, round 5)
+  def test_more_asset_after_the_slash_of_the_preview_url
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get '/projects/ecookbook/repository/samples/preview/sample.zip@/inner/hello.txt'
+      assert_response :success
+      assert_equal "hello inner\n", response.body
+      get "/projects/ecookbook/repository/samples/#{@repository.changesets.first.revision}/preview/sample.zip@/top.txt"
+      assert_response :success
+      # only that slash: an absolute path or one leading out is still refused
+      secret = File.join(Dir.mktmpdir('rmp-secret'), 'secret.txt')
+      File.write(secret, 'RMP-ASSET-SECRET')
+      ["%2F#{secret[1..].gsub('/', '%2F')}", "#{'..%2F' * 20}#{secret[1..].gsub('/', '%2F')}"].each do |asset|
+        get "/projects/ecookbook/repository/samples/preview/sample.zip@/#{asset}"
+        assert_response :not_found
+        assert_not_include 'RMP-ASSET-SECRET', response.body
+      end
+    end
+  end
+
   def test_more_preview_needs_a_repository_permission
     Role.find(1).remove_permission!(:view_changesets)
     Role.find(1).remove_permission!(:browse_repository)
