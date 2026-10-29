@@ -316,6 +316,10 @@ class AttachmentPreviewsTest < Redmine::IntegrationTest
       get "/attachments/more_preview/#{attachment.id}/index.txt", :headers => { 'If-None-Match' => etag }
       assert_response :not_modified
       Setting.plugin_redmine_more_previews = Setting.plugin_redmine_more_previews.merge('debug' => '1')
+      # the setter clears the cache under the symbol, Converter.debug? reads the
+      # string key; a request clears the whole cache only if the setting's
+      # updated_on (whole seconds) is not before the last clear
+      Setting.clear_cache
       get "/attachments/more_preview/#{attachment.id}/index.txt", :headers => { 'If-None-Match' => etag }
       assert_response :success
       assert_include 'Converter debug information', response.body
