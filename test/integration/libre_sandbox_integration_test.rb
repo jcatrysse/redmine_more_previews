@@ -141,6 +141,60 @@ class LibreSandboxIntegrationTest < ActiveSupport::TestCase
     remove_preview_attachments
   end
 
+  # the images of an HTML preview are found by their links, for a repository
+  # file whose name has no ASCII letter or digit (it keeps its name in the
+  # sandbox) and for an attachment (its name is made ASCII before, #25077)
+  def test_html_image_links_resolve_for_non_ascii_names
+    { '会議録.docx' => :repository, 'Offerte_Réunion 2026.docx' => :attachment }.each do |name, type|
+      Dir.mktmpdir('rmp-libre-image-link') do |dir|
+        src = File.join(dir, type == :repository ? name : '261029_Offerte_R_union_2026.docx')
+        FileUtils.cp(File.join(FILES, 'sample_image.docx'), src)
+        cache = File.join(RedmineMorePreviews::Constants::Defaults::MORE_PREVIEWS_STORAGE_PATH, 'libre-image-link', type.to_s)
+        object = type == :repository ? { :type => :repository, :path => "docs/#{name}" } : { :type => :attachment, :object => Attachment.new(:filename => name) }
+        with_converters(:libre => { :docx => 'html' }) do
+          data = RedmineMorePreviews::Converter.convert(src, File.join(cache, 'index.html'), :object => object, :preview_format => 'html')
+          assert_includes data.to_s, 'LIBRE-IMAGE-LINK-TEST', name
+          links = data.scan(/<img[^>]* src="([^"]+)"/i).flatten
+          assert_equal 1, links.size, "#{name}: #{links.inspect}"
+          assert_match(/_html_\h+\.png\z/, links.first, name)
+          assert File.file?(File.join(cache, URI.decode_uri_component(links.first))), "#{name}: #{links.first} names a stored image"
+        end
+      ensure
+        FileUtils.rm_rf(File.join(RedmineMorePreviews::Constants::Defaults::MORE_PREVIEWS_STORAGE_PATH, 'libre-image-link'))
+      end
+    end
+  end
+
+  # without the C.UTF-8 locale LibreOffice writes the links of a non-ASCII name
+  # encoded twice (Offerte_R%C3%83%C2%A9union%202026_html_...): fix_image_path
+  # sets them right (port of curecodejp 43a7eec, 6b15276, fa1fbca). The sandbox
+  # here sets LANG=C.UTF-8; a host without that locale falls back to C, as this
+  # test does
+  def test_html_image_links_are_fixed_when_the_sandbox_has_no_utf8_locale
+    worker = Libre.allocate
+    Dir.mktmpdir('rmp-libre-image-link') do |root|
+      output = File.join(root, 'output')
+      profile = File.join(root, 'profile')
+      [output, profile].each { |dir| FileUtils.mkdir_p(dir) }
+      input = File.join(root, '会議録.docx')
+      FileUtils.cp(File.join(FILES, 'sample_image.docx'), input)
+      worker.tmpdir = output
+      worker.preview_format = 'html'
+      command = Shellwords.split(worker.soffice(input, File.join(profile, 'user_installation')))
+      command[command.index('C.UTF-8')] = 'C'
+      stdout, stderr, status = Timeout.timeout(120) { Open3.capture3(*command) }
+      assert status.success?, "Sandboxed LibreOffice failed: #{stdout} #{stderr}"
+      html = File.join(output, '会議録.html')
+      assert_match(/img src="%C3%A4%C2%BC%C2%9A[^"]*_html_/, File.read(html), 'precondition: encoded twice')
+      worker.send(:validate_libre_output!)
+      worker.send(:fix_image_path)
+      links = File.read(html).scan(/<img[^>]* src="([^"]+)"/i).flatten
+      assert_equal 1, links.size
+      assert links.first.start_with?('%E4%BC%9A%E8%AD%B0%E9%8C%B2_html_'), links.first
+      assert File.file?(File.join(output, URI.decode_uri_component(links.first))), "#{links.first} names the image"
+    end
+  end
+
   # a conversion that runs out of time is stopped with the sandbox and every
   # LibreOffice process in it (bwrap starts them in a new session)
   def test_sandboxed_conversion_is_stopped_at_the_time_limit

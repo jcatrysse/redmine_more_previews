@@ -53,6 +53,8 @@ class Libre < RedmineMorePreviews::Conversion
       # what LibreOffice wrote is untrusted: no symlink or hard link is followed,
       # renamed or copied into the cache
       validate_libre_output!
+      fix_image_path
+      validate_libre_output!
       # LibreOffice names its output after the input inside the sandbox
       generated = File.join(tmpdir, File.basename(sandbox_input_name(source), '.*') + ".#{preview_format}")
       raise ConverterShellError, 'LibreOffice output is missing' unless File.file?(generated)
@@ -111,6 +113,24 @@ class Libre < RedmineMorePreviews::Conversion
     raise ConverterShellError, "Could not inspect LibreOffice output: #{e.class}"
   end #def
   private :validate_libre_output!
+  
+  # without a UTF-8 locale LibreOffice writes the image links of an HTML output
+  # whose name is not ASCII encoded twice (Offerte_R%C3%83%C2%A9union%202026_html_*),
+  # and the images are not found. The sandbox sets LANG=C.UTF-8; a host without
+  # that locale falls back to C. The links get the output's name, URL encoded
+  # once (port of curecodejp 43a7eec, 6b15276, fa1fbca). Only the output in
+  # tmpdir, on the host after soffice has exited and after validate_libre_output!
+  # (a regular file, no link followed); read and written as bytes
+  def fix_image_path
+    filepath = Dir.glob('*.html', base: tmpdir).first
+    return if filepath.nil?
+    basefilename = File.basename(filepath, '.html')
+    return if basefilename.ascii_only?
+    filepath = File.join(tmpdir, filepath)
+    text = File.binread(filepath)
+    File.binwrite(filepath, text.gsub(/(?<=img src=")([A-Za-z%\d_.-]+)(?=_html)/n, ERB::Util.url_encode(basefilename)))
+  end #def
+  private :fix_image_path
   
   # LibreOffice names a spreadsheet's sheet after the input file and prints the
   # sheet name as the page header (pdf, png, jpg of a csv). Inside the sandbox the
