@@ -33,7 +33,11 @@ module RedmineMorePreviews
     # may hold a file of the server a document pointed to (upstream cef06a3).
     # Round 7 (upstream 0042aad): Maggie stored a PDF as png/jpg/gif without
     # Ghostscript, Vince's inline image types and Libre's image links changed
-    CACHE_FORMAT_VERSION = 'converter-fixes-v1'.freeze
+    # Round 8 (upstream 6b44d3a, 5ac6319, d6a2029): Cliff's list of attachments
+    # linked none of them in the first conversion and an attachment without an
+    # extension stored the email as not previewed, which the attachment and
+    # repository pages now read from the cache; Vince ended its logo with '%>'
+    CACHE_FORMAT_VERSION = 'converter-fixes-v2'.freeze
     SAFE_DEBUG_FIELDS = %w(converter converter_version plugin_version source_type preview_format).freeze
   
     
