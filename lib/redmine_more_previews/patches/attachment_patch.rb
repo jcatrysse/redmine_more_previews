@@ -89,9 +89,14 @@ module RedmineMorePreviews
           # path functions
           #
           ################################################################################
-          def asset_link( asset )
+          # generated: Cliff makes the link while it writes its list of attachments,
+          # before the files it extracted reach the cache (port of curecodejp 5ac6319)
+          def asset_link( asset, generated = false )
           
             extname  = File.extname( asset )
+            # the route needs an extension: an attachment without one is listed by
+            # its name, the email still previewed (port of curecodejp 5ac6319)
+            return ERB::Util.html_escape( asset.to_s ) if extname.length <= 1
             # with its folders, as Repository#asset_link (upstream a213a44)
             basename = asset.delete_suffix( extname )
             
@@ -99,9 +104,9 @@ module RedmineMorePreviews
               self, basename, extname[1..-1]
             )
             
-            if asset_available?(:asset => asset)
+            if generated || asset_available?(:asset => asset)
               ApplicationController.helpers.link_to( asset, _link,
-               :class => "icon icon-file #{Marcel::MimeType.for(Pathname.new(preview_assetpath(:asset => asset)), name: File.basename(asset))&.tr('/', '-')}",
+               :class => "icon icon-file #{Marcel::MimeType.for(generated ? nil : Pathname.new(preview_assetpath(:asset => asset)), name: File.basename(asset))&.tr('/', '-')}",
                :style => "padding-top:2px;padding-bottom:2px;"
               )
             else

@@ -31,10 +31,12 @@ RedmineApp::Application.routes.draw do
     :constraints => {:id => /\d+/, :format => /[^.]+/},
     :as          => "more_preview"
   
+  # an extension may hold '+', '_', '~', '-' or Unicode: anything but the dot and
+  # the slash (port of curecodejp 5ac6319; :format constrained nothing here)
   get 'attachments/more_preview/:id/(*asset).:assetformat', 
     :controller  => 'attachments',
     :action      => 'more_asset',
-    :constraints => {:id => /\d+/, :asset => /.*/, :format => /[^.]+/},
+    :constraints => {:id => /\d+/, :asset => /.*/, :assetformat => /[^.\/]+/},
     :as          => "more_asset"
     
   #
@@ -53,11 +55,11 @@ RedmineApp::Application.routes.draw do
   get "projects/:id/repository/:repository_id/preview(/*path).:baseformat@(*asset).:assetformat",
     :controller  => 'repositories',
     :action      => "more_asset",
-    :constraints => {:path => /.*?/, :asset => /.*/, :baseformat => /[A-Za-z0-9]+/, :assetformat => /[A-Za-z0-9]+/}
+    :constraints => {:path => /.*?/, :asset => /.*/, :baseformat => /[A-Za-z0-9]+/, :assetformat => /[^.\/]+/}
     
   get "projects/:id/repository/:repository_id/:rev/preview(/*path).:baseformat@(*asset).:assetformat",
     :controller  => 'repositories',
     :action      => "more_asset",
-    :constraints => {:rev => /[a-z0-9\.\-_]+/, :path => /.*?/, :baseformat => /[A-Za-z0-9]+/, :asset => /.*/, :assetformat => /[A-Za-z0-9]+/}
+    :constraints => {:rev => /[a-z0-9\.\-_]+/, :path => /.*?/, :baseformat => /[A-Za-z0-9]+/, :asset => /.*/, :assetformat => /[^.\/]+/}
     
 end

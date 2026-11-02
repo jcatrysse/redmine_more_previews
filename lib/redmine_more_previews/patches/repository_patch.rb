@@ -136,13 +136,19 @@ module RedmineMorePreviews
           # path functions
           #
           ################################################################################
-          def asset_link( path, rev, asset )
+          # generated: Cliff makes the link while it writes its list of attachments,
+          # before the files it extracted reach the cache (port of curecodejp 5ac6319)
+          def asset_link( path, rev, asset, generated = false )
           
+            # both asset routes need an extension: an attachment without one is
+            # listed by its name (port of curecodejp 5ac6319)
+            assetformat = File.extname(asset)
+            return ERB::Util.html_escape( asset.to_s ) if assetformat.length <= 1
+            
             extname     = File.extname( path)
             basename    = File.basename(path, extname)
             dirname     = File.dirname(path)
             
-            assetformat = File.extname(asset)
             # the folders of the asset stay in its link: the controller finds the
             # stored asset by them (upstream a213a44)
             assetname   = asset.delete_suffix(assetformat)
@@ -161,9 +167,9 @@ module RedmineMorePreviews
               :only_path     => true
             )
             
-            if asset_available?(path, rev, :asset => asset)
+            if generated || asset_available?(path, rev, :asset => asset)
               ApplicationController.helpers.link_to( asset, _link,
-                :class => "icon icon-file #{Marcel::MimeType.for(Pathname.new(preview_assetpath(path, rev, :asset => asset)), name: File.basename(asset))&.tr('/', '-')}",
+                :class => "icon icon-file #{Marcel::MimeType.for(generated ? nil : Pathname.new(preview_assetpath(path, rev, :asset => asset)), name: File.basename(asset))&.tr('/', '-')}",
                 :style => "padding-top:2px;padding-bottom:2px;"
               )
             else

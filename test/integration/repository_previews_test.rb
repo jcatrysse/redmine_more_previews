@@ -267,6 +267,51 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  # port of curecodejp 5ac6319 (#56): an attachment without an extension is listed
+  # by its name, the others are linked by the first conversion, also with an
+  # extension of other characters than letters and digits
+  def test_mail_with_an_attachment_without_extension
+    mail = Mail.new do
+      from 'author@example.test'
+      to 'reader@example.test'
+      subject 'repository attachments'
+      text_part { body 'repository body survives' }
+    end
+    mail.add_file(filename: 'Makefile', content: 'all: test')
+    mail.add_file(filename: 'notes.txt', content: 'repository note')
+    mail.add_file(filename: 'source.c++', content: 'source code')
+    mail.add_file(filename: 'notes.v_2', content: 'v2 data')
+    mail.add_file(filename: 'backup.txt~', content: 'backup data')
+    File.binwrite(File.join(@dir, 'mail.eml'), mail.to_s)
+    system('git', '-C', @dir, 'add', '.', exception: true, out: File::NULL, err: File::NULL)
+    system('git', '-C', @dir, '-c', 'user.name=Test', '-c', 'user.email=test@example.net', 'commit', '-q', '-m', 'mail', exception: true, out: File::NULL, err: File::NULL)
+    @repository.fetch_changesets
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get '/projects/ecookbook/repository/samples/preview/mail.eml@/index.html'
+      assert_response :success
+      assert_include 'repository body survives', response.body
+      get '/projects/ecookbook/repository/samples/preview/mail.eml@/attachments.html'
+      assert_response :success
+      document = Nokogiri::HTML.fragment(response.body)
+      assert_include 'Makefile', document.text
+      assert_not_include 'Makefile', document.css('a').map(&:text)
+      %w(notes.txt source.c++ notes.v_2 backup.txt~).each do |name|
+        link = document.css('a').find { |a| a.text == name }
+        assert link, "no link for #{name}"
+        recognized = Rails.application.routes.recognize_path(CGI.unescapeHTML(link['href']), method: :get)
+        assert_equal 'more_asset', recognized[:action], name
+        assert_equal name, "#{Array(recognized[:asset]).join('/')}.#{recognized[:assetformat]}", name
+        get CGI.unescapeHTML(link['href'])
+        assert_response :success, name
+      end
+      get '/projects/ecookbook/repository/samples/preview/mail.eml@/source.c++'
+      assert_response :success
+      assert_equal 'source code', response.body
+      assert_equal 'README&lt;script&gt;', @repository.asset_link('mail.eml', nil, 'README<script>', true)
+    end
+  end
+
   def test_more_preview_needs_a_repository_permission
     Role.find(1).remove_permission!(:view_changesets)
     Role.find(1).remove_permission!(:browse_repository)
