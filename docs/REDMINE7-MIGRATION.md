@@ -153,7 +153,8 @@ has none.
 | MariaDB + 3 other GEOxyz plugins (not committed) | 15 | 6 | 8 scripts, 46 screenshots | 0 |
 | PostgreSQL 16 after Jan's decisions (`docs/e2e/`, replaces the run above) | 15 | 6 | 9 scripts, 62 screenshots | 0 |
 | PostgreSQL 16 after round 5 (`docs/e2e/`, current) | 15 | 6 | 13 scripts, 89 screenshots (helpdesk_mail checks nothing without the helpdesk) | 0 |
-| PostgreSQL 16 after round 7 (`docs/e2e/`, current; maggie with Ghostscript installed, round7 without) | 16 | 6 | 21 scripts, 121 screenshots | 0 (maggie without Ghostscript: 4, the correct 404 for sample.pdf to png) |
+| PostgreSQL 16 after round 8 (`docs/e2e/`, current; no Ghostscript, `RMP_LIBRE_REQUIRE_SANDBOX` server with bubblewrap 0.9.0) | 16 | 6 | 22 scripts, 130 screenshots | 0 (maggie without Ghostscript: 4, the correct 404 for sample.pdf to png, as in round 7) |
+| PostgreSQL 16 after round 7 (`docs/e2e/`; maggie with Ghostscript installed, round7 without) | 16 | 6 | 21 scripts, 121 screenshots | 0 (maggie without Ghostscript: 4, the correct 404 for sample.pdf to png) |
 | PostgreSQL 16 after round 6 (`docs/e2e/`, replaced by the run above; the scenarios touched by the review fixes run again on the final code) | 16 | 6 | 21 scripts, 135 screenshots | 0 |
 | PostgreSQL 16 with all 37 other GEOxyz plugins, round 5 (`docs/e2e/combined/`, current) | 16 | 6 | 13 scripts, 93 screenshots | 1, not from this plugin (redmine_view_issue_description's 403) |
 | PostgreSQL 16 after round 4 | 15 | 6 | 11 scripts, 77 screenshots | 0 |
