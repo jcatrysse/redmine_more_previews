@@ -59,6 +59,19 @@ class Cliff < RedmineMorePreviews::Conversion
   # Conversion#isolated)
   MAX_MEMORY     = 1024 * 1024 * 1024
   
+  # the headers hold translated labels and dates: the language they are stored
+  # in, beside the converter's marker, outside the preview's directory, so it is
+  # never an attachment nor served as an asset (port of curecodejp d6a2029)
+  LOCALE_MARKER  = '.cliff_locale'.freeze
+  
+  # whether the headers stored for preview_path are in that language
+  def self.cache_locale_matches?( preview_path, locale )
+    marker = "#{File.dirname( preview_path )}#{LOCALE_MARKER}"
+    File.file?( marker ) && !File.symlink?( marker ) && File.read( marker ).strip == locale.to_s
+  rescue SystemCallError
+    false
+  end #def
+  
   ########################################################################################
   #
   # convert
@@ -77,6 +90,13 @@ class Cliff < RedmineMorePreviews::Conversion
       isolated( :memory => max_memory ) { silence_warnings { eml } }
     end
   end #def
+  
+  # in this process, with the cache lock, when the preview is stored
+  def write_marker
+    File.write( "#{dir}#{LOCALE_MARKER}", I18n.locale.to_s ) if dir
+    super
+  end #def
+  private :write_marker
   
   ########################################################################################
   #

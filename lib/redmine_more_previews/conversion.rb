@@ -410,6 +410,8 @@ module RedmineMorePreviews
       raise ConverterBadArgument unless Lib::RmpFile.within_directory?( RedmineMorePreviews::Constants::Defaults::MORE_PREVIEWS_STORAGE_PATH, dir )
       FileUtils.rm_rf( dir )
       FileUtils.rm_f( marker_path )
+      # the language of Cliff's stored headers, beside the marker (see Cliff#write_marker)
+      FileUtils.rm_f( "#{dir}.cliff_locale" )
       Lib::RmpAssetList.remove( dir )
     end #def
     private :discard_cache
@@ -429,11 +431,27 @@ module RedmineMorePreviews
     
     # the converter, the cache format and whether the preview is a debug one:
     # debug and normal previews are stored apart and never served for each other
-    def cache_marker
+    def self.cache_marker_for( converter_id )
       mode = RedmineMorePreviews::Converter.debug? ? 'debug' : 'normal'
-      "#{id}:#{CACHE_FORMAT_VERSION}:#{mode}"
+      "#{converter_id}:#{CACHE_FORMAT_VERSION}:#{mode}"
+    end #def
+    
+    def cache_marker
+      self.class.cache_marker_for( id )
     end #def
     private :cache_marker
+    
+    # whether the preview at preview_path is stored, by that converter, in the
+    # current format. A look without the cache lock, to choose between reading
+    # the stored assets and one conversion that is not stored (Cliff's hooks):
+    # what is read is checked again under the lock (port of curecodejp d6a2029)
+    def self.current_cached_preview?( preview_path, converter_id )
+      marker = "#{File.dirname( preview_path )}.converter"
+      File.file?( preview_path ) && !File.symlink?( preview_path ) &&
+        File.file?( marker ) && File.read( marker ).strip == cache_marker_for( converter_id )
+    rescue SystemCallError
+      false
+    end #def
     
     def cached_by_this_converter?
       marker_path && File.file?( marker_path ) && File.read( marker_path ).strip == cache_marker

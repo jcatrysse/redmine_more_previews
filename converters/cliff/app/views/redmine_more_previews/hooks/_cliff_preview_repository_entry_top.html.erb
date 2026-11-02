@@ -11,7 +11,26 @@
       beyond the limits, leaves the boxes out instead of turning the page into a 503
       or 413 (the preview frame below answers for itself) %>
   <%- begin %>
-  <%- repository.more_asset( path, rev, :assets => ["headers.html", "fields.html", "attachments.html"] ) do |html, asset, email_headers, email_fields, email_attachments| %>
+  <%# the stored conversion is read, as the preview frame reads it; a block
+      given to more_asset converts the email again, for every view of the page.
+      That is done only where nothing current can be read: an administrator's
+      reload or unsafe view, the cache off or full, or the headers stored in
+      another language (port of curecodejp d6a2029) %>
+  <%  names   = %w(headers.html fields.html attachments.html)
+      reload  = params[:reload].present? && User.current.admin?
+      unsafe  = params[:unsafe].present? && User.current.admin?
+      cached  = RedmineMorePreviews::Converter.cache_previews?
+      current = cached && RedmineMorePreviews::Conversion.current_cached_preview?( repository.preview_filepath(path, rev), :cliff )
+      if cached && !reload && !unsafe &&
+         ( current ? Cliff.cache_locale_matches?( repository.preview_filepath(path, rev), I18n.locale ) : !RedmineMorePreviews::Lib::RmpCacheSize.full? )
+        # a preview not stored yet is converted by the first name, once
+        fragments = names.map {|name| repository.more_asset( path, rev, :asset => name ) }
+      else
+        # one conversion, not stored: the preview, the asset (none), the three names
+        fragments = repository.more_asset( path, rev, :assets => names, :reload => reload ) {|_html, _asset, *data| data }
+      end
+      email_headers, email_fields, email_attachments = fragments
+  %>
   
     <% if email_headers %>
       <div class="box"><%= more_previews_inline(email_headers) %></div>
@@ -26,7 +45,6 @@
       <div class="box"><%= more_previews_inline(email_attachments) %></div>
     <%- end %>
     
-  <%- end %>
   <%- rescue RedmineMorePreviews::Exceptions::ConverterLockTimeOut %>
   <%- rescue RedmineMorePreviews::Exceptions::ConverterTooLarge => e %>
     <%# the preview frame below answers 413, which browsers do not show in an
