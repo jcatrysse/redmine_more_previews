@@ -38,7 +38,22 @@ module VObject
       # provide language of redmine (not user language)
       #
       def global_lang
-        Setting.default_language
+        Localization.global_lang
+      end #def
+      
+      # the language read before the fork of a preview (see Vince#convert): the
+      # child must not read Setting. Outside a preview, Redmine's default language.
+      # Every Vince translation goes through here (port of curecodejp 6b44d3a)
+      def self.global_lang
+        language || Setting.default_language
+      end #def
+      
+      def self.language
+        Thread.current[:redmine_more_previews_vince_language]
+      end #def
+      
+      def self.language=(lang)
+        Thread.current[:redmine_more_previews_vince_language] = lang
       end #def
       
       #-----------------------------------------------------------------------------------

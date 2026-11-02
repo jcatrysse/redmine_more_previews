@@ -21,24 +21,60 @@
 
 class Vince < RedmineMorePreviews::Conversion
   
+  # the vCard is parsed and rendered in Ruby, which nothing else bounds: in a
+  # child process with this much memory and the conversion timeout (see
+  # Conversion#isolated), as Cliff parses an email (port of curecodejp 6b44d3a,
+  # GHSA-hm82-jvvw-hmg4)
+  MAX_MEMORY = 512 * 1024 * 1024
+  
+  # larger vCards are refused before the fork (413). 100,000 cards take some
+  # 4 MB, which leaves room for photos embedded as data URIs
+  MAX_SIZE   = 20 * 1024 * 1024
+  
   def convert
   
-    @vcfs    = VinceLib::VObject::Reader.new(:object => :vcard, :filepath => source).fileall
+    # what the child needs from the database is read here, before the fork, and
+    # the translations loaded: the child must not use the inherited connection
     @iconize = converter_settings["iconize"].to_i > 0
+    @vince_default_language = Setting.default_language
+    I18n.with_locale(@vince_default_language){ I18n.translate(:"vcard.personal") }
     
-    # create preview
-    case preview_format
+    # without fork (Windows) Lib::RmpProcess.fork runs the block here, without
+    # limits: an untrusted vCard is not parsed in the server's process
+    raise ConverterShellError, "Vince requires process isolation" unless Process.respond_to?(:fork)
     
-    when "html", "inline"
-      erb  = ERB.new(File.read(File.join(views, 'vince', 'vince.html.erb')))
-      obj  = I18n.with_locale(Setting.default_language){erb.result(binding).html_safe}.squish
-      
-    when "txt"
-      erb  = ERB.new(File.read(File.join(views, 'vince', 'vince.txt.erb')))
-      obj  = I18n.with_locale(Setting.default_language){erb.result(binding).html_safe}.gsub(/\n{3,}/, "\n")
+    if File.size(source) > MAX_SIZE
+      raise ConverterTooLarge, "the vCard is larger than #{MAX_SIZE / 1024 / 1024} MiB"
     end
     
-    File.open(tmptarget, "wb"){|f| f.write obj}
+    isolated( :memory => MAX_MEMORY ) do
+      VinceLib::VObject::Modules::Localization.language = @vince_default_language
+      begin
+        @vcfs = VinceLib::VObject::Reader.new(:object => :vcard, :filepath => source).fileall
+        
+        # create preview
+        case preview_format
+        
+        when "html", "inline"
+          erb  = ERB.new(File.read(File.join(views, 'vince', 'vince.html.erb')))
+          obj  = I18n.with_locale(@vince_default_language){erb.result(binding).html_safe}.squish
+          
+        when "txt"
+          erb  = ERB.new(File.read(File.join(views, 'vince', 'vince.txt.erb')))
+          obj  = I18n.with_locale(@vince_default_language){erb.result(binding).html_safe}.gsub(/\n{3,}/, "\n")
+        end
+        
+        File.open(tmptarget, "wb"){|f| f.write obj}
+        
+      rescue StandardError => e
+        # the child leaves without a message (see Lib::RmpProcess.fork): why the
+        # vCard was not previewed goes to the log. The message can quote the vCard
+        Rails.logger.error "vCard #{File.basename(source)} not previewed: #{e.class}: #{e.message}\n#{Array(e.backtrace).join("\n")}"
+        raise
+      ensure
+        VinceLib::VObject::Modules::Localization.language = nil
+      end
+    end
     
   end #def
   
