@@ -20,7 +20,7 @@ what is left. Written 2026-10-06 from a measured analysis (report at the bottom)
 | Upstream | HugoHasenbein/redmine_more_previews main @ 0bca937b36c56e3114e582b9bdf3384814d394ca (2025-02-13, 5.0.9) |
 | Runs on Redmine 7 as is | NEE (boot) |
 | Runs on Redmine 7 after this branch | JA: tests and e2e green on PostgreSQL 16 (see "Results"); also with the other GEOxyz plugins, apart from their own defects listed there |
-| Migration session | done 2026-10-06; Jan's decisions of 2026-10-07, round 4 (2026-10-11), round 5 (2026-10-12, security fixes of curecodejp 6.1.2: conversion limits, Vince) round 6 (2026-10-19, curecodejp 6.1.3: Libre in a bubblewrap sandbox, debug redaction, module off, Cliff 413, repository cache removal) and round 7 (2026-10-29, curecodejp 6.1.4: Vince, Maggie without Ghostscript, Libre image links, cache format) built (see "Decided by Jan") |
+| Migration session | done 2026-10-06; Jan's decisions of 2026-10-07, round 4 (2026-10-11), round 5 (2026-10-12, security fixes of curecodejp 6.1.2: conversion limits, Vince) round 6 (2026-10-19, curecodejp 6.1.3: Libre in a bubblewrap sandbox, debug redaction, module off, Cliff 413, repository cache removal) round 7 (2026-10-29, curecodejp 6.1.4: Vince, Maggie without Ghostscript, Libre image links, cache format) and round 8 (2026-11-02, curecodejp 6.1.5: Vince in a child process (GHSA-hm82), Cliff extensionless attachments, cached Cliff headers, legacy Cliff files) built (see "Decided by Jan") |
 | Upstream sync | UPSTREAM DOOD: nothing upstream; fork already equals upstream 5.0.9 + 2 own commits; claude/redmine7-rails8-compat 4eb8dea cherry-picked |
 | After sync | n.v.t. |
 | Complexity (1 trivial .. 5 rewrite) | 3 |
@@ -137,6 +137,8 @@ These GEOxyz commits are on the branch GEOxyz runs today and therefore on this b
 | 7.0-stable-GEOxyz (7.0.2), after round 6 (`fe0ca79`), `RMP_LIBRE_REQUIRE_SANDBOX=1` (the real sandbox tests ran) | PostgreSQL 16 | 331 runs, 2095 assertions, 0 failures, 0 errors, 0 skips |
 | 7.0-stable-GEOxyz (`578730a`), before round 7 (`4990f70`), `RMP_LIBRE_REQUIRE_SANDBOX=1`, no Ghostscript | PostgreSQL 16.15 | 336 runs, 2122 assertions, 0 failures, 0 errors, 2 skips (Ghostscript) |
 | 7.0-stable-GEOxyz (`578730a`), after round 7 (`71d755f`), `RMP_LIBRE_REQUIRE_SANDBOX=1`, no Ghostscript; seeds 28664 and 27367 | PostgreSQL 16.15 | 365 runs, 2307 assertions, 0 failures, 0 errors, 2 skips (Ghostscript) |
+| 7.0-stable-GEOxyz (2026-11-02), before round 8 (`36e40ed`), bubblewrap 0.9.0, `RMP_LIBRE_REQUIRE_SANDBOX=1`, no Ghostscript | PostgreSQL 16 | 365 runs, 2307 assertions, 0 failures, 0 errors, 2 skips (Ghostscript) |
+| same, after round 8 (`ebe6d6c`) | PostgreSQL 16 | 392 runs, 2559 assertions, 0 failures, 0 errors, 2 skips (Ghostscript) |
 | (former, 5.1 no longer required) 5.1-stable, Ruby 3.2.6, at `c19f76f` | PostgreSQL 16 | 46 runs, 361 assertions, 0 failures, 0 errors, 0 skips |
 
 Boot and production eager load: OK (the e2e server runs in production mode). Migrations: the plugin
@@ -225,6 +227,7 @@ migration sessions; this plugin's scenarios pass there):
 | Emails beyond Cliff's limits: 413 with the reason, a warning on the page (round 6) | attachment | limits | limits-emails-refused, limits-nested-page |
 | Purge of all stored previews `cache:clean DAYS=0 CONFIRM_PURGE_ALL=1` (round 6) | rake, once after the upgrade | cache_purge | cache_purge-rake |
 | vCard 3.0 PHOTO/LOGO as HTML (image/jpeg, image/png) and as text; a PDF by Maggie without Ghostscript gives no preview; Libre HTML with an image for "Offerte_Réunion 2026.docx" and a repository "docs/会議録.docx"; as reporter too (round 7) | attachment, repository entry | round7 | round7-*.png |
+| A vCard as HTML and text without `%>`; a vCard over 20 MiB answered 413 before forking, the server process answers on; an email with Makefile, notes.txt, source.c++, backup.txt~ as attachment and in the repository (listed, linked, served); the headers above an email read from the cache on both pages; as reporter too (round 8) | attachment, repository entry | round8 | round8-*.png |
 | REST API, mail in/out | the plugin has none | - | - |
 
 ### Reviews
@@ -258,6 +261,11 @@ migration sessions; this plugin's scenarios pass there):
   `application/octet-stream`, as upstream (the old code built `image/image/jpeg`, not shown either).
 - Round 7: OpenAI review (gpt-5) of `4990f70..71d755f`, `docs/reviews/openai-2026-10-29-71d755f.md`:
   no findings.
+- Round 8 (2026-11-02): own review of `36e40ed..d0e1c58`: found upstream's fallback block order
+  (fixed in `ebe6d6c`, see "Round 8"); the rest recorded under "Found, not changed" there.
+- Round 8: OpenAI review (gpt-5) of `36e40ed..d0e1c58`, `docs/reviews/openai-2026-11-02-d0e1c58.md`:
+  1 finding (Vince's child logs the error message and backtrace), not changed, with the reason (the
+  plugin's practice for every failed conversion and Cliff since round 5; nothing of the server in it).
 
 ### Not tested here (needs production or is out of reach)
 
@@ -580,6 +588,53 @@ in the final form ported. Found, not changed: Vince reads a vCard line of more t
 bytes in pieces, so an unfolded inline photo (not allowed by RFC 6350, which folds at 75 octets) is
 cut and not shown; the e2e card is folded.
 
+**Round 8, 2026-11-02: curecodejp/redmine_more_previews v6.1.5** (security release, tag v6.1.5,
+advisory GHSA-hm82-jvvw-hmg4). Jan, 2026-11-02 (coordinator session; `docs/DECISIONS-2026-10-07.md`,
+"Round 8"): port everything except the release text. Ported by hand, each commit names the
+upstream commits ("port of curecodejp <sha>"); every fix has a test that fails without it, seen by
+running the new tests on the old code (36e40ed, a worktree with the new test files: 68 runs,
+18 failures, 6 errors; listed per commit).
+
+| commit here | what | tests, red on the old code |
+|---|---|---|
+| `54d4c57` | **SECURITY** (GHSA-hm82) Vince parsed and rendered an uploaded vCard in the worker without timeout or memory limit. Now in `Conversion#isolated` (512 MiB, conversion timeout); `iconize` and `Setting.default_language` read before the fork, every Vince translation (templates, PHOTO/LOGO alt, `Localization.global_lang`) uses that language in the child; no fork: not parsed; over 20 MiB: 413 before forking; the child logs why; no `%>` after the logo. Fitted to our Localization module (an accessor for the thread's language) and the round 7 Vince code | vince_isolation_test (upstream's + no fork): 7 of 9 red (pid of reader and ERB = request pid, fork never called, blocking reader 20 s, `Vince::MAX_SIZE` missing, nothing logged, `class="logo" %>`, parsed without fork). e2e on the old code: the 20 MiB vCard held the request 87 s in the worker, RSS 654 MB to 1.2 GB; after: 413 at once, same pid |
+| `a199c65` | Cliff top hook `::Hooks::CliffEmlTopHook` (a top-level `Hooks` constant) now `CliffLib::Hooks::CliffEmlTopHook`. `lib/lib.rb`, `lib/hooks/*` (not required by init.rb; the converters' lib dirs are not Zeitwerk dirs, checked) and the `lib/cliff/*.html.erb` copies (Cliff reads `PluginPath#views` = app/views) removed, with our template-sync test (it compared the removed files; upstream's test that they are gone replaces it) | cliff_hooks_test (upstream's): 2 of 4 red |
+| `7c4d9a3` | Cliff with an attachment without extension: `more_asset_path(..., nil)` raised, the whole email was stored as "not previewed"; now listed as text (escaped). `generated` flag: the first conversion links the attachments (they reach the cache after the list is written). Attachment asset route: `:assetformat => /[^.\/]+/` (it constrained `:format`, which it has not); both repository asset routes the same (were `[A-Za-z0-9]+`: `source.c++`, `notes.v_2`, `backup.txt~` 404). Our folder-keeping `Repository#asset_link` (a213a44) kept | cliff_attachment_links_test (upstream's), repository_previews_test#test_mail_with_an_attachment_without_extension (upstream's repository test on our git fixture, each link fetched): both red (email not previewed) |
+| `98de8a5` | cache format `converter-fixes-v2` (ours; upstream `maintenance-6.1.5-v1`): Cliff's stored lists and "not previewed" pages and Vince's `%>` are converted again, the ETag changes | conversion_debug_redaction_test#test_cached_output_from_round_7_is_rebuilt: red (a `converter-fixes-v1` preview served as stored) |
+| `ebe6d6c` | Cliff's hook partials converted the email again, in a forked child, on **every view** of the attachment or repository page (`more_asset` with a block), though the frame reads the stored conversion. Now `headers.html`, `fields.html`, `attachments.html` are read from the cache; one conversion not stored only for an admin's reload/unsafe, the cache off, full without a current preview, or headers stored in another language (`<dir>.cliff_locale`, removed by `discard_cache` and `rmp_cache_clean`). `Conversion.current_cached_preview?` / `cache_marker_for`. Our begin/rescue (busy, refused) and `more_previews_inline` kept. **Not as upstream:** upstream's fallback block `\|_html, *data\|` gets the empty asset slot first, so the headers land in the folded box and the fields in the attachments box; ours skips it (`\|_html, _asset, *data\|`) | cliff_cached_fragments_test, cliff_repository_cached_fragments_test (upstream's, with `expects(:convert).never` instead of a conversion that raises, which the stored headers hid, and the order of the boxes), cache_clean_test: 11 of 13 red; the box order red on upstream's block form (4 failures). e2e: a probe written into the stored headers.html is shown by the next view (old code: not, it converts). Five page views: attachment 184-302 ms before, 86-110 ms after; repository 809-978 ms before, 532-665 ms after |
+| `d0e1c58` | e2e `round8.mjs` | 0 problems after; on the old code the run stopped at the 20 MiB vCard (Playwright's 30 s timeout while the worker parsed it for 87 s) |
+
+Upstream commits v6.1.4..v6.1.5 (11: one merge, 5c9e53f; 6b44d3a is a squash despite its title), verdict per commit:
+
+| upstream | subject | verdict |
+|---|---|---|
+| 083bd59 | test: cover Cliff hook uniqueness, view partials and template resolution | ported `a199c65` |
+| 5f486ed | test: match Cliff listener class names without regular expressions | ported `a199c65` |
+| 5d87d4f | fix: namespace Cliff top hook under CliffLib to match Zeitwerk path | ported `a199c65` |
+| 586f949, 0f21b82, 6814046 | chore: remove unused legacy Cliff hook loader and classes | ported `a199c65` (checked: never required, not autoloaded) |
+| 5c9e53f | Merge pull request #54 | merge of the above |
+| 2677ef1 | chore: remove obsolete duplicate Cliff ERB templates (#55) | ported `a199c65`; our sync test removed with the copies, replaced by upstream's |
+| 5ac6319 | Fix Cliff previews with extensionless mail attachments (#56) | ported `7c4d9a3` |
+| d6a2029 | Reuse cached Cliff email headers on attachment and repository pages (#57) | ported `ebe6d6c` (fallback block fixed, see above); its cache version as `98de8a5` |
+| 6b44d3a | Merge commit from fork (GHSA-hm82-jvvw-hmg4, squash incl. "Release 6.1.5") | ported `54d4c57`; not ported (Jan): README, plugin version 6.1.5, Cliff 1.1.4 / Vince 1.1.3 and their change logs (our converter versions were never changed in earlier rounds) |
+
+Tests of upstream left out, with the reason: none of the new ones. Upstream's removal of three
+template-sync tests (cliff_body_test, cliff_headers_test) applies to us as one test
+(`test_bundled_template_copies_are_in_sync`, ours covered all four copies): removed with the files
+it compared.
+
+Found, not changed:
+- A vCard refused with 413 (over 20 MiB) leaves the attachment page without preview and without a
+  reason: a browser shows nothing of a 413 in the object frame; Cliff has its hook warning (round 6),
+  Vince and the other converters have none (`round8-vcard-too-large.png`). Same as any 413 of the
+  other converters before this round.
+- The repository page reads the file from the repository once per fragment (three `cat`s) and once
+  for the frame; still faster than the conversion it replaces (measured above). Upstream the same.
+- `Lib::RmpProcess.fork` still runs its block in the worker without fork (Windows); Vince now fails
+  closed, Cliff does not (upstream the same). Production runs Linux.
+- A page request with `Accept: */*` only gets core's page of the file, not the plugin's preview
+  (`request.format.html?`); browsers send `text/html`. Seen while writing the e2e, pre-existing.
+
 ## After the upgrade (production)
 
 Actions the person doing the upgrade must take, or know about, for this plugin:
@@ -601,8 +656,12 @@ Actions the person doing the upgrade must take, or know about, for this plugin:
   ImageMagick's `policy.xml` the coders PS, PS2, PS3, EPS, EPI, EPSI, EPSF, MVG, MSL, TEXT, URL, HTTP,
   HTTPS and FTP disabled (from curecodejp's README; they do not stop PostScript reaching Ghostscript
   through the PDF coder, which Maggie's start-of-file check does).
-- Round 7 changed the cache format (`converter-fixes-v1`): previews stored before are converted
-  again on their next view; the old files stay on disk until the purge below or the daily clean.
+- Round 7 changed the cache format (`converter-fixes-v1`), round 8 again (`converter-fixes-v2`):
+  previews stored before are converted again on their next view; the old files stay on disk until
+  the purge below or the daily clean.
+- Vince (round 8, GHSA-hm82): a vCard is parsed in a child process stopped at 512 MiB of memory
+  growth and the conversion timeout; vCards over 20 MiB are refused (413). Each Vince conversion
+  forks like Cliff's; the memory plan above covers it (Vince's limit is half Cliff's).
 - Empty the preview cache once after deploying: `rm -rf <redmine>/tmp/more_previews/*`, or since
   round 6 the rake task with `DAYS=0 CONFIRM_PURGE_ALL=1` (below). Cached zip
   tables from before still carry the double-encoded links, and repository previews moved to a new

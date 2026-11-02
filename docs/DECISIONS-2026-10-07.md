@@ -201,3 +201,27 @@ to `redmine70-migration`:
   minimal diff).
 
 Built: see "Round 7" in docs/REDMINE7-MIGRATION.md.
+
+## Round 8, 2026-11-02: curecodejp/redmine_more_previews v6.1.5
+
+Jan decided (2026-11-02, through the coordinator session) to port everything of
+https://github.com/curecodejp/redmine_more_previews tag v6.1.5 (release:
+https://github.com/curecodejp/redmine_more_previews/releases/tag/v6.1.5, advisory
+GHSA-hm82-jvvw-hmg4) to `redmine70-migration`, except the release text:
+
+- PORT: 6b44d3a (the GHSA fix: Vince parses and renders in `Conversion#isolated`,
+  512 MiB and the conversion timeout, settings and language read before the fork,
+  fail closed without fork, vCards over 20 MiB refused with 413 before forking,
+  child errors logged, the stray `%>` after the logo), 5ac6319 (#56, Cliff with
+  extensionless mail attachments, the `generated` flag, both `asset_link`s and the
+  asset routes), d6a2029 (#57, cached Cliff header fragments on attachment and
+  repository pages, locale and full-cache handling, rmp_cache_clean), 083bd59,
+  5f486ed, 5d87d4f, 586f949, 0f21b82, 6814046, 2677ef1 (#54, #55, the Cliff hook
+  namespace and the removal of the legacy loader, hooks and template copies), the
+  cache invalidation of 6.1.5 as a new `CACHE_FORMAT_VERSION` of ours, and the
+  tests of these commits that cover code we have.
+- DO NOT PORT: README changes, version numbers in init.rb and the converter init
+  files (our plugin version stays; converter versions only if earlier rounds
+  changed them, which they did not).
+
+Built: see "Round 8" in docs/REDMINE7-MIGRATION.md.
