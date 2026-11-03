@@ -225,3 +225,28 @@ GHSA-hm82-jvvw-hmg4) to `redmine70-migration`, except the release text:
   changed them, which they did not).
 
 Built: see "Round 8" in docs/REDMINE7-MIGRATION.md.
+
+## Round 9, 2026-11-03: curecodejp/redmine_more_previews v6.1.6
+
+Jan decided (2026-11-03, through the coordinator session) to port the size
+limits of https://github.com/curecodejp/redmine_more_previews tag v6.1.6
+(release: https://github.com/curecodejp/redmine_more_previews/releases/tag/v6.1.6,
+no security advisory) to `redmine70-migration`, with their tests:
+
+- PORT: 5fb219a (#61) and dc493bc (#62): inline preview html over 256 KiB is
+  not sanitized, cached or embedded; a size notice in the page; previews
+  already cached checked against the limit when read; on our
+  `more_previews_inline`, before sanitizing and caching; the new locale key.
+  ebe0641 (#63): Cliff's embedded fragments limited to 256 KiB before cache
+  reads, the notice in the page, 413 for a direct request of the fragment.
+  bed742c (#65): the fragments checked before a conditional request, so old
+  cached fragments never get a 304. 6ce4793 (#64): port the code only where
+  ours still differs (round 8 fixed the boxes, our hooks rescue
+  ConverterTooLarge), port the tests in any case as guards. All tests of
+  these commits that cover code we have; the new keys in every shipped
+  locale, jp.yml and pt-BR.yml included, no new languages.
+- DO NOT PORT: a216324, 6304084 (README), 4161887 (welcome text and Teddie
+  description), 74b8e51 (benchmark script), 667d864 (release; converter
+  versions unchanged). No new CACHE_FORMAT_VERSION unless the port needs it.
+
+Built: see "Round 9" in docs/REDMINE7-MIGRATION.md.

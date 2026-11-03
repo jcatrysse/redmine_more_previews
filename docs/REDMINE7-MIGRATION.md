@@ -20,7 +20,7 @@ what is left. Written 2026-10-06 from a measured analysis (report at the bottom)
 | Upstream | HugoHasenbein/redmine_more_previews main @ 0bca937b36c56e3114e582b9bdf3384814d394ca (2025-02-13, 5.0.9) |
 | Runs on Redmine 7 as is | NEE (boot) |
 | Runs on Redmine 7 after this branch | JA: tests and e2e green on PostgreSQL 16 (see "Results"); also with the other GEOxyz plugins, apart from their own defects listed there |
-| Migration session | done 2026-10-06; Jan's decisions of 2026-10-07, round 4 (2026-10-11), round 5 (2026-10-12, security fixes of curecodejp 6.1.2: conversion limits, Vince) round 6 (2026-10-19, curecodejp 6.1.3: Libre in a bubblewrap sandbox, debug redaction, module off, Cliff 413, repository cache removal) round 7 (2026-10-29, curecodejp 6.1.4: Vince, Maggie without Ghostscript, Libre image links, cache format) and round 8 (2026-11-02, curecodejp 6.1.5: Vince in a child process (GHSA-hm82), Cliff extensionless attachments, cached Cliff headers, legacy Cliff files) built (see "Decided by Jan") |
+| Migration session | done 2026-10-06; Jan's decisions of 2026-10-07, round 4 (2026-10-11), round 5 (2026-10-12, security fixes of curecodejp 6.1.2: conversion limits, Vince) round 6 (2026-10-19, curecodejp 6.1.3: Libre in a bubblewrap sandbox, debug redaction, module off, Cliff 413, repository cache removal) round 7 (2026-10-29, curecodejp 6.1.4: Vince, Maggie without Ghostscript, Libre image links, cache format) round 8 (2026-11-02, curecodejp 6.1.5: Vince in a child process (GHSA-hm82), Cliff extensionless attachments, cached Cliff headers, legacy Cliff files) and round 9 (2026-11-03, curecodejp 6.1.6: inline html and Cliff fragments limited to 256 KiB, no 304 for old fragments) built (see "Decided by Jan") |
 | Upstream sync | UPSTREAM DOOD: nothing upstream; fork already equals upstream 5.0.9 + 2 own commits; claude/redmine7-rails8-compat 4eb8dea cherry-picked |
 | After sync | n.v.t. |
 | Complexity (1 trivial .. 5 rewrite) | 3 |
@@ -139,6 +139,8 @@ These GEOxyz commits are on the branch GEOxyz runs today and therefore on this b
 | 7.0-stable-GEOxyz (`578730a`), after round 7 (`71d755f`), `RMP_LIBRE_REQUIRE_SANDBOX=1`, no Ghostscript; seeds 28664 and 27367 | PostgreSQL 16.15 | 365 runs, 2307 assertions, 0 failures, 0 errors, 2 skips (Ghostscript) |
 | 7.0-stable-GEOxyz (2026-11-02), before round 8 (`36e40ed`), bubblewrap 0.9.0, `RMP_LIBRE_REQUIRE_SANDBOX=1`, no Ghostscript | PostgreSQL 16 | 365 runs, 2307 assertions, 0 failures, 0 errors, 2 skips (Ghostscript) |
 | same, after round 8 (`ebe6d6c`) | PostgreSQL 16 | 392 runs, 2559 assertions, 0 failures, 0 errors, 2 skips (Ghostscript) |
+| 7.0-stable-GEOxyz (`578730a`, 2026-11-03), before round 9 (`ce95f1c`), bubblewrap 0.9.0, `RMP_LIBRE_REQUIRE_SANDBOX=1`, no Ghostscript, seed 51048 | PostgreSQL 16.15 | 392 runs, 2559 assertions, 0 failures, 0 errors, 2 skips (Ghostscript) |
+| same, after round 9 (`66c5d24`), seed 41580 | PostgreSQL 16.15 | 427 runs, 2753 assertions, 0 failures, 0 errors, 2 skips (Ghostscript) |
 | (former, 5.1 no longer required) 5.1-stable, Ruby 3.2.6, at `c19f76f` | PostgreSQL 16 | 46 runs, 361 assertions, 0 failures, 0 errors, 0 skips |
 
 Boot and production eager load: OK (the e2e server runs in production mode). Migrations: the plugin
@@ -153,6 +155,7 @@ has none.
 | MariaDB + 3 other GEOxyz plugins (not committed) | 15 | 6 | 8 scripts, 46 screenshots | 0 |
 | PostgreSQL 16 after Jan's decisions (`docs/e2e/`, replaces the run above) | 15 | 6 | 9 scripts, 62 screenshots | 0 |
 | PostgreSQL 16 after round 5 (`docs/e2e/`, current) | 15 | 6 | 13 scripts, 89 screenshots (helpdesk_mail checks nothing without the helpdesk) | 0 |
+| PostgreSQL 16 after round 9 (`66c5d24`; only `round9-*` recommitted, the other screenshots stay those of round 8) | 16 | 6 | 23 scripts, 138 screenshots | 0 (maggie without Ghostscript: 4, as in rounds 7 and 8); round9 on the old code `ce95f1c`: 9 |
 | PostgreSQL 16 after round 8 (`docs/e2e/`, current; no Ghostscript, `RMP_LIBRE_REQUIRE_SANDBOX` server with bubblewrap 0.9.0) | 16 | 6 | 22 scripts, 130 screenshots | 0 (maggie without Ghostscript: 4, the correct 404 for sample.pdf to png, as in round 7) |
 | PostgreSQL 16 after round 7 (`docs/e2e/`; maggie with Ghostscript installed, round7 without) | 16 | 6 | 21 scripts, 121 screenshots | 0 (maggie without Ghostscript: 4, the correct 404 for sample.pdf to png) |
 | PostgreSQL 16 after round 6 (`docs/e2e/`, replaced by the run above; the scenarios touched by the review fixes run again on the final code) | 16 | 6 | 21 scripts, 135 screenshots | 0 |
@@ -229,6 +232,7 @@ migration sessions; this plugin's scenarios pass there):
 | Purge of all stored previews `cache:clean DAYS=0 CONFIRM_PURGE_ALL=1` (round 6) | rake, once after the upgrade | cache_purge | cache_purge-rake |
 | vCard 3.0 PHOTO/LOGO as HTML (image/jpeg, image/png) and as text; a PDF by Maggie without Ghostscript gives no preview; Libre HTML with an image for "Offerte_Réunion 2026.docx" and a repository "docs/会議録.docx"; as reporter too (round 7) | attachment, repository entry | round7 | round7-*.png |
 | A vCard as HTML and text without `%>`; a vCard over 20 MiB answered 413 before forking, the server process answers on; an email with Makefile, notes.txt, source.c++, backup.txt~ as attachment and in the repository (listed, linked, served); the headers above an email read from the cache on both pages; as reporter too (round 8) | attachment, repository entry | round8 | round8-*.png |
+| An inline preview converted to more than 256 KiB of html: a notice, not stored or embedded, the server answers on; a small one as before; an email whose header fields are over 256 KiB: a notice in place of the fields, fields.html directly 413, as attachment, repository entry and reporter; an old oversized fields.html revalidated: 413, not 304; an email over Cliff's size limit keeps the page with its reason, with and without the cache (round 9) | attachment, repository entry | round9 | round9-*.png |
 | REST API, mail in/out | the plugin has none | - | - |
 
 ### Reviews
@@ -267,6 +271,9 @@ migration sessions; this plugin's scenarios pass there):
 - Round 8: OpenAI review (gpt-5) of `36e40ed..d0e1c58`, `docs/reviews/openai-2026-11-02-d0e1c58.md`:
   1 finding (Vince's child logs the error message and backtrace), not changed, with the reason (the
   plugin's practice for every failed conversion and Cliff since round 5; nothing of the server in it).
+- Round 9 (2026-11-03): own review of `ce95f1c..4f079c3`: no defect; recorded under "Found, not changed" in
+  "Round 9".
+- Round 9: OpenAI review (gpt-5) of `ce95f1c..4f079c3`, `docs/reviews/openai-2026-11-03-4f079c3.md`: no findings.
 
 ### Not tested here (needs production or is out of reach)
 
@@ -635,6 +642,65 @@ Found, not changed:
   closed, Cliff does not (upstream the same). Production runs Linux.
 - A page request with `Accept: */*` only gets core's page of the file, not the plugin's preview
   (`request.format.html?`); browsers send `text/html`. Seen while writing the e2e, pre-existing.
+
+**Round 9, 2026-11-03: curecodejp/redmine_more_previews v6.1.6** (maintenance release, tag v6.1.6,
+https://github.com/curecodejp/redmine_more_previews/releases/tag/v6.1.6, no advisory). Jan,
+2026-11-03 (coordinator session; `docs/DECISIONS-2026-10-07.md`, "Round 9"): port the size limits
+of #61 to #65 and the tests, not the README, the welcome text, the benchmark script or the release.
+Ported by hand, each commit names the upstream commit ("port of curecodejp <sha>"); every fix has a
+test that fails without it, seen by running the commit's tests on its parent (the parent's code in
+the Redmine checkout, the commit's test files over it).
+
+Why: an inline preview (and Cliff's three header fragments) is sanitized by Rails in the Puma
+worker, outside the converter's time and memory limits; a converted html of many MiB costs worker
+CPU on every view of the page. Measured in the e2e: a textile converted to about 330 KiB of html
+took 1.5 to 2.4 s per page view before, 91 ms after (the first view converts and refuses).
+
+| commit here | what | tests, red on the parent |
+|---|---|---|
+| `7565230` | `MAX_INLINE_PREVIEW_HTML_BYTES` = 256 KiB; `more_previews_inline` (ours; upstream `sanitize_inline_preview`) refuses html over it before `sanitize`, counted in bytes after the conversion to UTF-8, not truncated, and shows `p.nodata` with the new `text_more_previews_inline_too_large` (all 10 locales, jp and pt-BR included, translated after `text_more_previews_too_large` of the same file) | inline_preview_limit_test (upstream's 4 of inline_preview_scrubber_test on our helper, + the constant, + German): 4 of 6 red on `ce95f1c` (3 failures, 1 error); the 2 green are guards (exactly 256 KiB accepted, a script below the limit removed) |
+| `85f429a` | `Conversion#output_limit_for`: an inline preview (and the index of one converted with an asset) is held to min(max_output, 256 KiB) in `check_output_size` (before it is stored) and `read_limited` (a stored one is not read); its assets keep max_output. The attachment and repository pages rescue `ConverterTooLarge` around the inline preview: the notice (a `ConverterRefused` its own reason, as our Cliff hook) instead of the controller's 413 replacing the page | conversion_limits_test (upstream's 6, verbatim: the file was identical), attachments_more_asset_test (upstream's + a refusal's reason), repository_previews_test (ours: a real 300 KiB markdown in the git repository instead of upstream's stub on a Filesystem repository): 7 of 9 red on `7565230` (6 failures, 1 error; the 2 green are guards: exactly 256 KiB read, a large asset with a small index); the repository test also red on `ce95f1c` (no notice, the html embedded) |
+| `a7ae5c0` | Cliff's `headers.html`, `fields.html`, `attachments.html` (Cliff, html, directly in the tmp or cache directory) over 256 KiB: stored as the marker `<!-- redmine_more_previews:cliff_fragment_too_large -->`, a stored one read as the marker without reading the file; the body, the extracted attachments and the other fragments are kept. The hooks show the notice in that fragment's place; `ControllerHelper#reject_oversized_cliff_fragment!` answers a direct request with 413 (only these names of a file Cliff previews by its name). Fitted to ours: `id` (upstream `converter.id`), `more_previews_inline`, our begin/rescue and `\|_html, _asset, *data\|` kept, `Array(fragments)` | conversion_limits_test (upstream's 4), cliff_cached_fragments_test (upstream's 2 + a fragment over the limit converted without the cache: notice and 413), cliff_repository_cached_fragments_test (upstream's repositories_more_asset_test case on this file's repository): 8 of 8 red on `85f429a` (4 failures, 4 errors) |
+| `15f5efc` | a fragment of a file Cliff previews is read and checked before `stale?`, for attachments and repository entries: one stored before the limit keeps its file and mtime, so its ETag (mtime, cache format, debug), and got 304. Other assets, archive entries named `fields.html` included, still answer 304 unread | cliff_cached_fragments_test, cliff_repository_cached_fragments_test (upstream's 4; the archive 304 test also asserts `more_asset` is not called): 2 of 4 red on `a7ae5c0` (304 instead of 413); the 2 green are the 304 guards |
+| `66c5d24` | 6ce4793 changes no code here: our hooks skip the asset slot since round 8 (`ebe6d6c`) and rescue `ConverterTooLarge` with a warning since round 6, so the page stays (with the refusal's reason, upstream its inline size notice). Its tests ported as guards, the notice asserted as ours (`p.warning` "the email has more than 1000 parts") | cliff_cached_fragments_test, cliff_repository_cached_fragments_test (upstream's 7): green on `ce95f1c`, as expected |
+| `4f079c3` | e2e `round9.mjs` | 0 problems; on `ce95f1c` 9 (the big inline preview embedded and stored, fragments embedded and served with 200, 304 for the old fragments) |
+
+`CACHE_FORMAT_VERSION` unchanged (as upstream): an inline preview or a fragment stored before is
+checked when it is read (`read_limited`) and, for a fragment, before a 304; nothing stored needs
+converting again.
+
+Upstream commits v6.1.5..v6.1.6 (10, no merges), verdict per commit:
+
+| upstream | subject | verdict |
+|---|---|---|
+| a216324 | docs: improve README for Redmine 6.0/6.1 users (#58) | not ported (Jan): README |
+| 74b8e51 | Add opt-in benchmark for inline HTML sanitizer resource use (#60) | not ported (Jan): benchmark script |
+| 4161887 | Clarify welcome text and Teddie converter description (#59) | not ported (Jan): welcome text and Teddie description |
+| 5fb219a | Limit inline HTML size before Rails sanitization (#61) | ported `7565230` (on `more_previews_inline`) |
+| dc493bc | Enforce inline HTML limit before caching and reading (#62) | ported `85f429a` |
+| ebe0641 | Limit Cliff embedded HTML fragments before cache reads (#63) | ported `a7ae5c0` |
+| bed742c | Check Cliff fragments before answering a conditional request (#65) | ported `15f5efc` |
+| 6ce4793 | Keep Cliff header fragments in their boxes and the page on oversized mail (#64) | already ours (`ebe6d6c`, round 6 rescue); tests ported as guards `66c5d24` |
+| 667d864 | Release 6.1.6 with Cliff 1.1.5 (#66) | not ported (Jan): plugin version, Cliff 1.1.5 (our converter versions unchanged, as in earlier rounds) |
+| 6304084 | Separate the inline preview limit from the output limit in the README (#67) | not ported (Jan): README |
+
+Tests of upstream left out, with the reason: none. inline_preview_scrubber_test exists only
+upstream (its `InlinePreviewScrubber` is not on this branch); its 4 new tests are in
+inline_preview_limit_test on our helper, `assert_not_includes 'alert(1)'` replaced by the exact
+output (Rails' sanitizer keeps the text of a removed `<script>`, inert, as before this round).
+repositories_more_asset_test exists only upstream: its 5 new tests are in repository_previews_test
+(the inline page, on a real conversion) and cliff_repository_cached_fragments_test (fragment, 413,
+the two 304 guards). conversion_limits_test: all 10, verbatim.
+
+Found, not changed:
+- An email with more than 1,000 header fields: Mail keeps 1,000, so a Content-Type after them is
+  lost and Cliff shows an empty body (seen while writing the e2e, its email now puts Content-Type
+  first). Pre-existing, upstream the same.
+- A fragment refused while converting without the cache is remembered as that asset's failure
+  (`too_large`): its next direct request answers 413 at once until the failure expires or an
+  admin reloads. Upstream the same; the page is unaffected.
+- The oversized-mail page (6ce4793) still shows nothing in the preview frame, whose 413 a browser
+  does not render; the reason above it says why (`round9-huge-*.png`, as in round 8).
 
 ## After the upgrade (production)
 
