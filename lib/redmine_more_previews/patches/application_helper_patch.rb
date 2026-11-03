@@ -27,6 +27,11 @@ module RedmineMorePreviews
       
       INLINE_TAGS = %w(table thead tbody tfoot tr th td caption colgroup col s u figure figcaption section article header footer)
       
+      # sanitizing runs in the Rails worker, outside the converter's process
+      # limits: a larger converted html is not parsed there (port of curecodejp
+      # 5fb219a, #61)
+      MAX_INLINE_PREVIEW_HTML_BYTES = 256 * 1024
+      
       def self.included(base)
         base.class_eval do
         
@@ -34,7 +39,12 @@ module RedmineMorePreviews
           
           # inline previews are converted user files rendered into the page itself
           def more_previews_inline(html)
-            sanitize(RedmineMorePreviews::Lib::RmpText.to_utf8(html.to_s),
+            html = RedmineMorePreviews::Lib::RmpText.to_utf8(html.to_s)
+            # not truncated: cut markup could change what the sanitizer lets through
+            if html.bytesize > RedmineMorePreviews::Patches::ApplicationHelperPatch::MAX_INLINE_PREVIEW_HTML_BYTES
+              return content_tag(:p, l(:text_more_previews_inline_too_large), :class => "nodata")
+            end
+            sanitize(html,
               :tags       => ActionView::Base.sanitized_allowed_tags.to_a + RedmineMorePreviews::Patches::ApplicationHelperPatch::INLINE_TAGS,
               :attributes => ActionView::Base.sanitized_allowed_attributes.to_a + %w(colspan rowspan align download style)
             )
