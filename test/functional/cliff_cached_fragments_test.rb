@@ -260,6 +260,75 @@ class CliffCachedFragmentsTest < Redmine::ControllerTest
     assert_equal 'cliff:converter-fixes-v2:normal', File.read("#{cache_dir}.converter")
   end
 
+  # port of curecodejp 6ce4793 (#64), as guards: ours had both since round 8
+  # (the |_html, _asset, *data| block, ebe6d6c) and round 6 (the hook rescues
+  # ConverterTooLarge with a warning)
+  WITH_ATTACHMENT = "From: writer@example.test\r\nTo: reader@example.test\r\nSubject: slot-mail-subject\r\n" \
+                    "MIME-Version: 1.0\r\nContent-Type: multipart/mixed; boundary=b\r\n\r\n" \
+                    "--b\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\nslot mail body\r\n" \
+                    "--b\r\nContent-Type: text/plain; name=slot-attached.txt\r\n" \
+                    "Content-Disposition: attachment; filename=slot-attached.txt\r\n\r\nattached\r\n--b--\r\n"
+
+  # the transient conversion yields the body, the (absent) asset and then the
+  # three fragments; each must land in its own box, as with a stored preview
+  def test_transient_fragments_keep_their_boxes
+    settings = Setting.plugin_redmine_more_previews.deep_dup
+    settings['cache_previews'] = '0'
+    Setting.plugin_redmine_more_previews = settings
+    Setting.clear_cache
+    attachment = upload_mail('slot.eml', WITH_ATTACHMENT)
+
+    get :show, params: {id: attachment.id, filename: attachment.filename, format: 'html'}
+    assert_response :success
+    assert_fragment_boxes 'slot-attached.txt'
+  end
+
+  def test_cached_fragments_keep_their_boxes
+    attachment = upload_mail('slot.eml', WITH_ATTACHMENT)
+
+    get :show, params: {id: attachment.id, filename: attachment.filename, format: 'html'}
+    assert_response :success
+    assert_fragment_boxes 'slot-attached.txt'
+  end
+
+  # an email beyond Cliff's limits answers 413 in the preview frame only; the
+  # attachment page stays, with its download link and the reason (upstream: its
+  # inline size notice; ours the refusal's own reason, since round 6).
+  # More MIME parts than Cliff's default max_parts (1,000)
+  MANY_PARTS = "From: writer@example.test\r\nSubject: many parts\r\nMIME-Version: 1.0\r\n" \
+               "Content-Type: multipart/mixed; boundary=b\r\n\r\n" +
+               (1..1100).map { |i| "--b\r\nContent-Type: text/plain\r\n\r\npart #{i}\r\n" }.join +
+               "--b--\r\n"
+
+  def test_email_beyond_limits_keeps_the_attachment_page
+    attachment = upload_mail('many-parts.eml', MANY_PARTS)
+
+    2.times do # converted the first time, a remembered failure the second
+      get :show, params: {id: attachment.id, filename: attachment.filename, format: 'html'}
+      assert_response :success
+      assert_select '#preview_repository_entry_top p.warning', :text => 'the email has more than 1000 parts', :count => 1
+      assert_select 'a[href*="download"]'
+      assert_select '#preview_pane'
+    end
+  end
+
+  # the transient branch (cache off, admin reload, other locale) gets the limit
+  # from the conversion child rather than from a stored failure
+  def test_email_beyond_limits_keeps_the_attachment_page_without_cache
+    settings = Setting.plugin_redmine_more_previews.deep_dup
+    settings['cache_previews'] = '0'
+    Setting.plugin_redmine_more_previews = settings
+    Setting.clear_cache
+    attachment = upload_mail('many-parts.eml', MANY_PARTS)
+
+    get :show, params: {id: attachment.id, filename: attachment.filename, format: 'html'}
+    assert_response :success
+    assert_select '#preview_repository_entry_top p.warning', :text => 'the email has more than 1000 parts', :count => 1
+    assert_select 'a[href*="download"]'
+    assert_select '#preview_pane'
+    assert_not File.file?(attachment.preview_filepath)
+  end
+
   private
 
   # the conversion that is not stored yields the preview and the asset slot
@@ -269,5 +338,27 @@ class CliffCachedFragmentsTest < Redmine::ControllerTest
     assert_select '#preview_repository_entry_top div.box:not([style]) table.white'
     assert_select '#preview_repository_entry_top div.box[style*="display:none"] table.email.header_fields'
     assert_select '#preview_repository_entry_top div.box[style*="display:none"] table.white', 0
+  end
+
+  def upload_mail(name, source)
+    path = File.join(@tmp, name)
+    File.binwrite(path, source)
+    upload = Rack::Test::UploadedFile.new(path, 'message/rfc822', true)
+    attachment = Attachment.new(container: Issue.find(1), file: upload, author: User.find(2))
+    assert attachment.save
+    attachment
+  end
+
+  def assert_fragment_boxes(attached_name)
+    boxes = css_select('#preview_repository_entry_top div.box')
+    assert_equal 3, boxes.size, response.body
+    headers, fields, attachments = boxes
+    assert headers.at_css('table.white'), 'headers.html belongs in the first box'
+    assert_nil headers['id']
+    assert fields.at_css('table.email.header_fields'), 'fields.html belongs in the collapsed box'
+    assert_match(/display:\s*none/, fields['style'].to_s)
+    assert_nil attachments.at_css('table.white')
+    assert_nil attachments.at_css('table.email.header_fields')
+    assert_includes attachments.text, attached_name
   end
 end
