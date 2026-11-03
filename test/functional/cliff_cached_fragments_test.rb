@@ -114,6 +114,38 @@ class CliffCachedFragmentsTest < Redmine::ControllerTest
     RedmineMorePreviews::Patches::ApplicationHelperPatch.const_set(:MAX_INLINE_PREVIEW_HTML_BYTES, 256 * 1024)
   end
 
+  # port of curecodejp bed742c (#65): a fragment stored (and fetched) before the
+  # limit existed keeps its file and mtime, hence its ETag: a browser
+  # revalidating it must still get 413, not 304
+  def test_conditional_get_of_an_oversized_cached_fragment_answers_413
+    get :show, params: {id: @attachment.id, filename: @attachment.filename, format: 'html'}
+    assert_response :success
+    fields_path = @attachment.preview_assetpath(asset: 'fields.html')
+    mtime = File.mtime(fields_path)
+
+    get :more_asset, params: {id: @attachment.id, asset: 'fields', assetformat: 'html'}
+    assert_response :success
+    etag = response.headers['ETag']
+    assert etag.present?
+
+    File.binwrite(fields_path, 'x' * 262_145)
+    File.utime(mtime, mtime, fields_path)
+    @request.if_none_match = etag
+    get :more_asset, params: {id: @attachment.id, asset: 'fields', assetformat: 'html'}
+    assert_response 413
+  end
+
+  def test_conditional_get_of_a_regular_fragment_stays_not_modified
+    get :show, params: {id: @attachment.id, filename: @attachment.filename, format: 'html'}
+    assert_response :success
+    get :more_asset, params: {id: @attachment.id, asset: 'fields', assetformat: 'html'}
+    assert_response :success
+
+    @request.if_none_match = response.headers['ETag']
+    get :more_asset, params: {id: @attachment.id, asset: 'fields', assetformat: 'html'}
+    assert_response :not_modified
+  end
+
   def test_repeat_attachment_page_reuses_cached_header_and_fields
     get :show, params: {id: @attachment.id, filename: @attachment.filename, format: 'html'}
     assert_response :success

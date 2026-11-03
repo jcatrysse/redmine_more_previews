@@ -134,11 +134,20 @@ module RedmineMorePreviews
           def send_more_asset
             sandbox_preview Rack::Mime.mime_type( File.extname(@asset) )
             if !preview_unsafe? && RedmineMorePreviews::Converter.cache_previews?
-              if preview_reload? || stale?(:etag => preview_etag(@attachment.asset_mtime(preview_params)))
-                # nil: the archive has no such entry, or its conversion failed
+              # a Cliff fragment stored before its size limit keeps its file and
+              # mtime, hence its ETag: it is checked before a conditional request
+              # can answer 304. The fragments are small; other assets (archive
+              # entries of the same name included) are not read first (port of
+              # curecodejp bed742c, #65)
+              if cliff_embedded_fragment_asset?
                 data = @attachment.more_asset(preview_params)
                 return render_404 if data.nil?
                 reject_oversized_cliff_fragment!(data)
+              end
+              if preview_reload? || stale?(:etag => preview_etag(@attachment.asset_mtime(preview_params)))
+                # nil: the archive has no such entry, or its conversion failed
+                data ||= @attachment.more_asset(preview_params)
+                return render_404 if data.nil?
                 send_data data,
                   :filename    => filename_for_content_disposition( File.basename(@asset) ),
                   :type        => Rack::Mime.mime_type( File.extname(@asset) ),

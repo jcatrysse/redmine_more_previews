@@ -126,11 +126,18 @@ module RedmineMorePreviews
           def send_more_asset
             sandbox_preview Rack::Mime.mime_type( File.extname(@asset) )
             if !preview_unsafe? && RedmineMorePreviews::Converter.cache_previews?
-              if preview_reload? || stale?(:etag => preview_etag(@repository.asset_mtime(@path, @rev, preview_params)))
-                # nil: the archive has no such entry, or its conversion failed
+              # see AttachmentsControllerPatch#send_more_asset: an old oversized
+              # Cliff fragment must not answer 304 under its unchanged ETag
+              # (port of curecodejp bed742c, #65)
+              if cliff_embedded_fragment_asset?
                 data = @repository.more_asset(@path, @rev, preview_params)
                 return render_404 if data.nil?
                 reject_oversized_cliff_fragment!(data)
+              end
+              if preview_reload? || stale?(:etag => preview_etag(@repository.asset_mtime(@path, @rev, preview_params)))
+                # nil: the archive has no such entry, or its conversion failed
+                data ||= @repository.more_asset(@path, @rev, preview_params)
+                return render_404 if data.nil?
                 send_data data,
                   :filename    => filename_for_content_disposition( File.basename(@asset) ),
                   :type        => Rack::Mime.mime_type( File.extname(@asset) ),

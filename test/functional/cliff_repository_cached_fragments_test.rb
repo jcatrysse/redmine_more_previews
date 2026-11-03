@@ -137,6 +137,68 @@ class CliffRepositoryCachedFragmentsTest < Redmine::ControllerTest
     assert_response 413
   end
 
+  # port of curecodejp bed742c (#65): see CliffCachedFragmentsTest, an old
+  # oversized fragment keeps its ETag
+  def test_conditional_get_of_an_oversized_repository_fragment_answers_413
+    File.binwrite(File.join(@repo_dir, 'fragment.eml'),
+      "From: writer@example.test\r\nSubject: preserved\r\nContent-Type: text/plain\r\n\r\nemail body")
+    get :entry, params: {id: PROJECT_ID, repository_id: @repository.id, format: 'html',
+                         path: repository_path_hash(['fragment.eml'])[:param]}
+    assert_response :success
+    fields = @repository.preview_assetpath('fragment.eml', nil, asset: 'fields.html')
+    mtime = File.mtime(fields)
+    asset = {id: PROJECT_ID, repository_id: @repository.id, path: repository_path_hash(['fragment'])[:param],
+             baseformat: 'eml', asset: 'fields', assetformat: 'html'}
+
+    get :more_asset, params: asset
+    assert_response :success
+    etag = response.headers['ETag']
+    assert etag.present?
+
+    File.binwrite(fields, 'x' * 262_145)
+    File.utime(mtime, mtime, fields)
+    @request.if_none_match = etag
+    get :more_asset, params: asset
+    assert_response 413
+  end
+
+  # archive entries keep answering conditional requests without being read
+  def test_conditional_get_of_an_archive_entry_stays_not_modified
+    build_zip(File.join(@repo_dir, 'a.zip'), 'dir/file.txt' => 'hello')
+    asset = {id: PROJECT_ID, repository_id: @repository.id, path: repository_path_hash(['a'])[:param],
+             baseformat: 'zip', asset: 'dir/file', assetformat: 'txt'}
+    # the first answer's ETag is of the time before the entry was extracted
+    get :more_asset, params: asset
+    assert_response :success
+    get :more_asset, params: asset
+    assert_response :success
+    etag = response.headers['ETag']
+    assert etag.present?
+
+    Repository::Filesystem.any_instance.expects(:more_asset).never
+    @request.if_none_match = etag
+    get :more_asset, params: asset
+    assert_response :not_modified
+  end
+
+  # an archive entry named like a Cliff fragment is an ordinary asset, even with
+  # the marker as its content: served, and 304 when unchanged
+  def test_archive_entry_named_like_a_cliff_fragment_is_an_ordinary_asset
+    marker = '<!-- redmine_more_previews:cliff_fragment_too_large -->'
+    build_zip(File.join(@repo_dir, 'a.zip'), 'fields.html' => marker)
+    asset = {id: PROJECT_ID, repository_id: @repository.id, path: repository_path_hash(['a'])[:param],
+             baseformat: 'zip', asset: 'fields', assetformat: 'html'}
+    get :more_asset, params: asset
+    assert_response :success
+    get :more_asset, params: asset
+    assert_response :success
+    assert_equal marker, response.body
+
+    @request.if_none_match = response.headers['ETag']
+    get :more_asset, params: asset
+    assert_response :not_modified
+  end
+
   private
 
   # the headers come first and are shown, the fields are folded (see
