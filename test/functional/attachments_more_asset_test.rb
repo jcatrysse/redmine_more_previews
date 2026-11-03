@@ -65,6 +65,35 @@ class AttachmentsMoreAssetTest < Redmine::ControllerTest
     end
   end
 
+  # port of curecodejp dc493bc (#62): an inline preview beyond a limit leaves
+  # the attachment page with a notice, not a 413 instead of the page
+  def test_oversized_inline_preview_preserves_attachment_page
+    Dir.mktmpdir do |dir|
+      a = attach(build_tar(File.join(dir, 'oversize.tar'), 'safe.txt' => 'safe'))
+      with_zippy_format('tar', 'inline') do
+        a.class.any_instance.stubs(:more_preview).raises(RedmineMorePreviews::Exceptions::ConverterTooLarge)
+        get :show, params: {id: a.id, filename: a.filename, format: 'html'}
+        assert_response :success
+        assert_select 'p.nodata', text: 'The inline preview exceeds the size limit. Download the file to view it.'
+        assert_includes response.body, a.filename
+        assert_select 'a[href*="download"]'
+      end
+    end
+  end
+
+  # ours: a refusal at a converter's limit says which, as the Cliff hook does
+  def test_refused_inline_preview_says_why_in_the_attachment_page
+    Dir.mktmpdir do |dir|
+      a = attach(build_tar(File.join(dir, 'refused.tar'), 'safe.txt' => 'safe'))
+      with_zippy_format('tar', 'inline') do
+        a.class.any_instance.stubs(:more_preview).raises(RedmineMorePreviews::Exceptions::ConverterRefused, 'refused.tar has more than 10 entries')
+        get :show, params: {id: a.id, filename: a.filename, format: 'html'}
+        assert_response :success
+        assert_select 'p.nodata', text: 'refused.tar has more than 10 entries'
+      end
+    end
+  end
+
   def with_zippy_format(ext, format)
     settings = Setting.plugin_redmine_more_previews.to_h.deep_dup
     settings['converter']['zippy']['mime_types'][ext]['format'] = format

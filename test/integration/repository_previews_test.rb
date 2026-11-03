@@ -52,6 +52,31 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  # port of curecodejp dc493bc (#62): converted html over 256 KiB is not stored,
+  # sanitized or embedded; the entry page stays and says why (before: the html
+  # was sanitized in the worker and embedded)
+  def test_inline_entry_over_the_inline_limit_leaves_a_notice
+    File.write(File.join(@dir, 'big.md'), "*big* " + ('word ' * 60_000))
+    system('git', '-C', @dir, 'add', 'big.md', exception: true, out: File::NULL, err: File::NULL)
+    system('git', '-C', @dir, '-c', 'user.name=Test', '-c', 'user.email=test@example.net', 'commit', '-q', '-m', 'big',
+           exception: true, out: File::NULL, err: File::NULL)
+    @repository.fetch_changesets
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get '/projects/ecookbook/repository/samples/entry/big.md'
+      assert_response :success
+      assert_select '#preview_repository_entry_top + div p.nodata',
+                    :text => 'The inline preview exceeds the size limit. Download the file to view it.'
+      assert_select '#preview_repository_entry_top + div em', 0
+      assert_empty Dir.glob(File.join(RedmineMorePreviews::Constants::Defaults::MORE_PREVIEWS_STORAGE_PATH, 'repository', '**', 'big.md', '**', 'index.inline'))
+      # remembered: the next view is answered at once, with the same notice
+      get '/projects/ecookbook/repository/samples/entry/big.md'
+      assert_response :success
+      assert_select '#preview_repository_entry_top + div p.nodata',
+                    :text => 'The inline preview exceeds the size limit. Download the file to view it.'
+    end
+  end
+
   def test_more_preview_returns_the_conversion
     with_converters(CONVERTERS) do
       log_user('jsmith', 'jsmith')
