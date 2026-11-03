@@ -85,6 +85,26 @@ module RedmineMorePreviews
     end
     private :render_more_preview_too_large
     
+    # headers.html, fields.html or attachments.html of a file Cliff previews: the
+    # fragments Cliff's hook embeds in the page. An archive entry of the same
+    # name is an ordinary asset (port of curecodejp ebe0641, bed742c)
+    def cliff_embedded_fragment_asset?
+      return false unless RedmineMorePreviews::Conversion::CLIFF_EMBEDDED_FRAGMENTS.include?(@asset.to_s)
+      source_name = @attachment&.filename || @entry&.name
+      source_name.present? && RedmineMorePreviews::Converter.responsible(source_name, :pathonly => true)&.id.to_s == 'cliff'
+    end #def
+    private :cliff_embedded_fragment_asset?
+    
+    # the marker of an oversized Cliff fragment is the hook's notice in the page;
+    # requested directly, the fragment is answered with 413 (port of curecodejp
+    # ebe0641, #63)
+    def reject_oversized_cliff_fragment!(data)
+      return unless cliff_embedded_fragment_asset?
+      return unless data == RedmineMorePreviews::Conversion::CLIFF_FRAGMENT_TOO_LARGE
+      raise RedmineMorePreviews::Exceptions::ConverterTooLarge, 'Embedded email fragment exceeds its preview limit'
+    end #def
+    private :reject_oversized_cliff_fragment!
+    
     # Previews and assets are converted user files served from Redmine's origin.
     # Sandbox them, so that a script in a converted html, svg or mail cannot act
     # in the user's Redmine session. Chrome does not render a PDF in a sandbox.

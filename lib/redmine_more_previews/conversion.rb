@@ -550,11 +550,29 @@ module RedmineMorePreviews
     end #def
     private :regular_file_within?
     
+    # the html fragments Cliff's hook embeds in the attachment and repository
+    # pages (see Cliff#convert): one larger than the inline limit is replaced by
+    # the marker, so the page shows a notice in its box and keeps the email and
+    # the other fragments; a direct request for it answers 413 (see
+    # ControllerHelper#reject_oversized_cliff_fragment!; port of curecodejp
+    # ebe0641, #63)
+    CLIFF_EMBEDDED_FRAGMENTS = %w(headers.html fields.html attachments.html).freeze
+    CLIFF_FRAGMENT_TOO_LARGE = '<!-- redmine_more_previews:cliff_fragment_too_large -->'.freeze
+    
+    def cliff_embedded_fragment?( path )
+      id.to_s == 'cliff' && preview_format == 'html' &&
+        CLIFF_EMBEDDED_FRAGMENTS.include?( File.basename( path.to_s ) ) &&
+        [tmpdir, dir].compact.any? {|root| File.dirname( path.to_s ) == root }
+    end #def
+    private :cliff_embedded_fragment?
+    
     # an inline preview is sanitized and embedded in the page by the worker: it
     # is held to the inline limit as well, before it is stored and when a stored
-    # one is read (port of curecodejp dc493bc, #62); its assets are not
+    # one is read (port of curecodejp dc493bc, #62); its assets are not. So are
+    # Cliff's embedded fragments (ebe0641, #63)
     def output_limit_for( path )
-      if preview_format == 'inline' && [tmptarget, (targetpath unless asset)].compact.include?( path )
+      if cliff_embedded_fragment?( path ) ||
+         ( preview_format == 'inline' && [tmptarget, (targetpath unless asset)].compact.include?( path ) )
         [RedmineMorePreviews::Converter.max_output,
          RedmineMorePreviews::Patches::ApplicationHelperPatch::MAX_INLINE_PREVIEW_HTML_BYTES].min
       else
@@ -565,10 +583,17 @@ module RedmineMorePreviews
     
     # the files to serve of a conversion in the tmp directory, see read_limited
     def check_output_size
-      [tmptarget, tmpasset].compact.each do |path|
+      paths = [tmptarget, tmpasset].compact
+      paths.concat( CLIFF_EMBEDDED_FRAGMENTS.map {|name| File.join( tmpdir, name ) } ) if id.to_s == 'cliff' && preview_format == 'html' && tmpdir
+      paths.uniq.each do |path|
         next unless File.file?( path )
         limit = output_limit_for( path )
         next unless File.size( path ) > limit
+        if cliff_embedded_fragment?( path )
+          # stored as the marker: the email, its attachments and the other fragments are kept
+          File.binwrite( path, CLIFF_FRAGMENT_TOO_LARGE )
+          next
+        end
         @asset_too_large = asset && path == tmpasset
         raise ConverterTooLarge, "#{File.basename(path)} is larger than #{limit} bytes"
       end
@@ -580,6 +605,8 @@ module RedmineMorePreviews
     def read_limited( path )
       limit = output_limit_for( path )
       if File.size( path ) > limit
+        # one stored before the limit, or converted without the cache
+        return CLIFF_FRAGMENT_TOO_LARGE if cliff_embedded_fragment?( path )
         @asset_too_large = asset && [tmpasset, assetpath].include?( path )
         raise ConverterTooLarge, "#{File.basename(path)} is larger than #{limit} bytes"
       end

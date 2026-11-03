@@ -50,6 +50,70 @@ class CliffCachedFragmentsTest < Redmine::ControllerTest
     FileUtils.rm_rf(@tmp)
   end
 
+  # port of curecodejp ebe0641 (#63): a stored fragment over 256 KiB is a notice
+  # in its place; the email, the other fragments and the page stay, and the
+  # fragment requested directly answers 413
+  def test_oversized_cached_fragment_stays_local_to_attachment_preview
+    get :show, params: {id: @attachment.id, filename: @attachment.filename, format: 'html'}
+    assert_response :success
+    fields_path = @attachment.preview_assetpath(asset: 'fields.html')
+    File.binwrite(fields_path, 'x' * 262_145)
+
+    get :show, params: {id: @attachment.id, filename: @attachment.filename, format: 'html'}
+    assert_response :success
+    assert_equal 1, response.body.scan('The inline preview exceeds the size limit. Download the file to view it.').length
+    assert_select '#preview_repository_entry_top p.nodata', 1
+    assert_includes response.body, 'cached-mail-subject'
+    assert_not_includes response.body, 'x' * 1000
+    assert_select '#preview_pane'
+    assert_select 'a[href*="download"]'
+
+    get :more_asset, params: {id: @attachment.id, asset: 'fields', assetformat: 'html'}
+    assert_response 413
+    assert_equal 'The file is too large to be previewed.', response.body
+  end
+
+  def test_transient_fragment_marker_stays_local_to_attachment_preview
+    settings = Setting.plugin_redmine_more_previews.deep_dup
+    settings['cache_previews'] = '0'
+    Setting.plugin_redmine_more_previews = settings
+    Setting.clear_cache
+    marker = '<!-- redmine_more_previews:cliff_fragment_too_large -->'
+    assert_equal marker, RedmineMorePreviews::Conversion::CLIFF_FRAGMENT_TOO_LARGE
+    Attachment.any_instance.stubs(:more_asset).with(has_entries(assets: %w[headers.html fields.html attachments.html])).returns(
+      ['<p>header visible</p>', marker, '<p>attachments visible</p>']
+    )
+
+    get :show, params: {id: @attachment.id, filename: @attachment.filename, format: 'html'}
+    assert_response :success
+    assert_equal 1, response.body.scan('The inline preview exceeds the size limit. Download the file to view it.').length
+    assert_includes response.body, 'header visible'
+    assert_includes response.body, 'attachments visible'
+    assert_select '#preview_pane'
+  end
+
+  # a fragment converted without the cache over the limit: the marker, in the
+  # page a notice, directly 413
+  def test_transient_oversized_fragment_answers_413_and_notice
+    settings = Setting.plugin_redmine_more_previews.deep_dup
+    settings['cache_previews'] = '0'
+    Setting.plugin_redmine_more_previews = settings
+    Setting.clear_cache
+    RedmineMorePreviews::Patches::ApplicationHelperPatch.send(:remove_const, :MAX_INLINE_PREVIEW_HTML_BYTES)
+    RedmineMorePreviews::Patches::ApplicationHelperPatch.const_set(:MAX_INLINE_PREVIEW_HTML_BYTES, 100)
+
+    get :more_asset, params: {id: @attachment.id, asset: 'headers', assetformat: 'html'}
+    assert_response 413
+
+    get :show, params: {id: @attachment.id, filename: @attachment.filename, format: 'html'}
+    assert_response :success
+    assert_select '#preview_repository_entry_top p.nodata', :minimum => 1
+    assert_not_includes response.body, 'cached-mail-subject'
+  ensure
+    RedmineMorePreviews::Patches::ApplicationHelperPatch.send(:remove_const, :MAX_INLINE_PREVIEW_HTML_BYTES)
+    RedmineMorePreviews::Patches::ApplicationHelperPatch.const_set(:MAX_INLINE_PREVIEW_HTML_BYTES, 256 * 1024)
+  end
+
   def test_repeat_attachment_page_reuses_cached_header_and_fields
     get :show, params: {id: @attachment.id, filename: @attachment.filename, format: 'html'}
     assert_response :success

@@ -138,6 +138,7 @@ module RedmineMorePreviews
                 # nil: the archive has no such entry, or its conversion failed
                 data = @attachment.more_asset(preview_params)
                 return render_404 if data.nil?
+                reject_oversized_cliff_fragment!(data)
                 send_data data,
                   :filename    => filename_for_content_disposition( File.basename(@asset) ),
                   :type        => Rack::Mime.mime_type( File.extname(@asset) ),
@@ -147,6 +148,7 @@ module RedmineMorePreviews
               @attachment.more_asset(preview_params) do |preview_data, asset_data|
                  # no such entry, or no output: answered with 404 below, not an empty 200
                  next if asset_data.nil?
+                 reject_oversized_cliff_fragment!(asset_data)
                  send_data asset_data,
                   :filename    => filename_for_content_disposition( File.basename(@asset) ),
                   :type        => Rack::Mime.mime_type( File.extname(@asset) ),

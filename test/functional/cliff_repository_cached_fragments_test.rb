@@ -110,6 +110,33 @@ class CliffRepositoryCachedFragmentsTest < Redmine::ControllerTest
     assert_includes response.body, 'repo-cache-subject'
   end
 
+  # port of curecodejp ebe0641 (#63), upstream's repositories_more_asset_test on
+  # this test's repository: the page and the email stay, the fragment is a notice
+  # there and 413 directly
+  def test_oversized_cliff_fragment_keeps_repository_page_and_body
+    File.binwrite(File.join(@repo_dir, 'fragment.eml'),
+      "From: writer@example.test\r\nSubject: preserved\r\nContent-Type: text/plain\r\n\r\nemail body")
+    params = {id: PROJECT_ID, repository_id: @repository.id, format: 'html',
+              path: repository_path_hash(['fragment.eml'])[:param]}
+    get :entry, params: params
+    assert_response :success
+    fields = @repository.preview_assetpath('fragment.eml', nil, asset: 'fields.html')
+    File.binwrite(fields, 'x' * 262_145)
+
+    get :entry, params: params
+    assert_response :success
+    assert_equal 1, response.body.scan('The inline preview exceeds the size limit. Download the file to view it.').length
+    assert_includes response.body, 'preserved'
+    assert_not_includes response.body, 'x' * 1000
+    assert_select 'h2'
+
+    # more_asset receives the file extension separately from the path
+    get :more_asset, params: {id: PROJECT_ID, repository_id: @repository.id,
+                              path: repository_path_hash(['fragment'])[:param],
+                              baseformat: 'eml', asset: 'fields', assetformat: 'html'}
+    assert_response 413
+  end
+
   private
 
   # the headers come first and are shown, the fields are folded (see
