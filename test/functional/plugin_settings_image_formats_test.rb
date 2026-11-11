@@ -121,9 +121,12 @@ class PluginSettingsImageFormatsTest < Redmine::ControllerTest
     assert_response :success
     assert_select '#converter_settings_maggie p', text: /HEIC\/HEIF \(magick\)/ do
       assert_select 'span.icon-error'
+      # ours: the icon is drawn (Redmine 7 has no image for the class alone)
+      assert_select 'span.icon-error svg use[href*="icon--warning"]'
     end
     assert_select '#converter_settings_maggie p', text: /TIFF \(magick\)/ do
       assert_select 'span.icon-ok'
+      assert_select 'span.icon-ok svg use[href*="icon--checked"]'
     end
   end
 

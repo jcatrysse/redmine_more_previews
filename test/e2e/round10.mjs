@@ -43,7 +43,7 @@ const settle = async (ms = 2500) => { await t.page.waitForTimeout(ms); await t.p
 
 // --- files
 const b64 = s => Buffer.from(s).toString('base64');
-const iso2022 = Buffer.from('1b2442467c4b5c386c244e4b5c4a382447243f1b2842', 'hex'); // 日本語の本文です in ISO-2022-JP
+const iso2022 = Buffer.from('1b2442467c4b5c386c244e4b5c4a38244724391b2842', 'hex'); // 日本語の本文です in ISO-2022-JP
 const jpEml = ['From: a@example.test', 'To: b@example.test', 'Subject: ROUND10-JP', 'MIME-Version: 1.0',
   'Content-Type: text/plain; charset=ISO-2022-JP', 'Content-Transfer-Encoding: base64', '', iso2022.toString('base64'), ''].join('\r\n');
 const cp1252Eml = ['From: a@example.test', 'To: b@example.test', 'Subject: ROUND10-W1252', 'MIME-Version: 1.0',
@@ -135,8 +135,8 @@ for (const [name, want] of [['round10-jp.eml', '日本語の本文です'], ['ro
 // --- inline: deep markup keeps the page; the large preview is sanitized once
 await t.go(`/attachments/${att['round10-deep.textile']}`);
 const deepBody = await t.page.content();
-note(`deep textile: page 200, ROUND10-DEEP shown ${deepBody.includes('ROUND10-DEEP')}`);
-await t.shot('inline-deep', 'Inline textile with 500 nested <div>: the page stays (Redmine 7 sanitizes with HTML4, which keeps it; under the HTML5 vendor it would show the "too complex" notice)', { full: false });
+note(`deep textile: page 200, text nested 500 deep shown ${deepBody.includes('ROUND10-DEEP')} (libxml2 keeps 256 levels)`);
+await t.shot('inline-deep', 'Inline textile with 500 nested <div>: the page stays (Redmine 7 sanitizes with HTML4: libxml2 drops what lies deeper than 256 levels, no error; under the HTML5 vendor the "too complex" notice)', { full: false });
 const timeOf = async url => { const t0 = Date.now(); const r = await t.page.request.get(t.BASE + url, { headers: { Accept: 'text/html' } }); await r.text(); return [r.status(), Date.now() - t0]; };
 const views = [];
 for (let i = 0; i < 4; i++) views.push(await timeOf(`/attachments/${att['round10-large.textile']}`));
@@ -145,7 +145,6 @@ if (views.some(([s]) => s !== 200)) t.problems.push('large inline: not 200');
 if (!(views[2][1] < views[0][1])) t.problems.push(`large inline: later view not faster ${JSON.stringify(views)}`);
 
 // --- PDF download names
-const libre = await t.page.request.get(`${t.BASE}/attachments/more_preview/${att['round10 Offerte.docx']}/index.pdf`);
 settings('s["converter"]["libre"]["mime_types"]["docx"]["format"] = "pdf"');
 const pdfA = await t.page.request.get(`${t.BASE}/attachments/more_preview/${att['round10 Offerte.docx']}/index.pdf`);
 const pdfR = await t.page.request.get(`${t.BASE}${R}/preview/round10%20report.docx@/index.pdf`);
@@ -176,7 +175,9 @@ for (const emb of ['0', '1']) {
       note(`  wheel over the text: frame scrolled to ${inner}, page from ${before} to ${after}`);
       if (!(inner > 0)) t.problems.push(`${emb}: text frame did not scroll`);
     }
-    await t.shot(`frame-${emb}-${name.endsWith('.txt') ? 'text' : 'pdf'}`, `${emb === '1' ? '<iframe>' : '<object>'}: ${name} in a pane of the window's height minus 320px${name.endsWith('.txt') ? ', scrolled inside its frame with the wheel' : ' (the PDF fills it; with <iframe> it was a 16px strip)'}`, { full: false });
+    // the frame's outline drawn for the screenshot (headless Chromium has no PDF viewer)
+    await t.page.addStyleTag({ content: '#preview_frame, #preview_object { outline: 2px dashed #c00; }' });
+    await t.shot(`frame-${emb}-${name.endsWith('.txt') ? 'text' : 'pdf'}`, `${emb === '1' ? '<iframe>' : '<object>'}: ${name} in a pane of the window's height minus 320px${name.endsWith('.txt') ? ', scrolled inside its frame with the wheel' : ' (the frame, outlined in red, fills it: with <iframe> it was a 16px strip; headless Chromium shows no PDF)'}`, { full: false });
   }
 }
 settings('s["embedding"] = "0"');
@@ -211,6 +212,7 @@ if (dbody !== 'the entry ROUND10') t.problems.push(`private zip download: ${dbod
 await t.shot('zip-private', 'Zippy in e2e-private: clicking index.html in the sandboxed frame downloads the entry (target _top, the page stays)', { full: false });
 
 // --- data: URIs in the private project
+settings('s["converter"]["libre"]["mime_types"]["docx"]["format"] = "html"');
 for (const [name, label] of [['round10-private.docx', 'Libre docx as HTML'], ['round10-private.eml', 'Cliff email with an inline image']]) {
   await t.go(`/attachments/${patt[name]}`);
   await settle(name.endsWith('.docx') ? 12000 : 3000);

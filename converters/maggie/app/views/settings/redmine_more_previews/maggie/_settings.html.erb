@@ -10,7 +10,9 @@
 </p>
 <% end %>
 <p><em class="info"><%= l(:"redmine_more_previews.maggie.text_help_limits") %></em></p>
-<%# whether the ImageMagick program Redmine runs has the coder of each format %>
+<%# whether the ImageMagick program Redmine runs has the coder of each format;
+    the icon as the status lines of the settings draw it (Redmine 7: SVG sprites) %>
 <% Maggie::IMAGE_FORMATS.each_value do |format| %>
-<p><%= format[:label] %> (<%= File.basename(RedmineMorePreviews.convert_bin.to_s) %>) <span class="icon-only <%= RedmineMorePreviews.imagemagick_reads?(format[:coder]) ? 'icon-ok' : 'icon-error' %>"></span></p>
+<% readable = RedmineMorePreviews.imagemagick_reads?(format[:coder]) %>
+<p><%= format[:label] %> (<%= File.basename(RedmineMorePreviews.convert_bin.to_s) %>) <span class="icon-only <%= readable ? 'icon-ok' : 'icon-error' %>"><%= sprite_icon(readable ? 'checked' : 'warning') %></span></p>
 <% end %>
