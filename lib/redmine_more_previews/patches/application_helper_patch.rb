@@ -42,6 +42,12 @@ module RedmineMorePreviews
         :size => 32 * 1024 * 1024, :expires_in => 1.hour
       )
       
+      # text and PDF previews scroll inside their frame: a pane sized by its width
+      # (padding-top:141%) is taller than the window on a wide screen and made the
+      # page scroll as well. It leaves room for what the page shows around it
+      # (port of curecodejp add99bb, #75); html previews keep their pane
+      NON_HTML_PREVIEW_PANE_STYLE = "position:relative;height:calc(100vh - 320px);min-height:280px;"
+      
       def self.included(base)
         base.class_eval do
         
@@ -108,6 +114,9 @@ module RedmineMorePreviews
           
           def more_previews_tag(path, filename, options={})
           
+            html_preview = options[:type].to_s.split(';').first == 'text/html'
+            pane_style   = html_preview ? "position:relative;padding-top:141%;" :
+                           RedmineMorePreviews::Patches::ApplicationHelperPatch::NON_HTML_PREVIEW_PANE_STYLE
             if RedmineMorePreviews::Converter.embed?
               content_tag(:div, 
                 content_tag(
@@ -121,7 +130,7 @@ module RedmineMorePreviews
                    }.merge(options)
                 ),
                 :id     => "preview_pane",
-                :style  => "position:relative;padding-top:141%;",
+                :style  => pane_style,
               )
             else
               content_tag(:div, 
@@ -134,7 +143,8 @@ module RedmineMorePreviews
                   # stayed a strip (port of curecodejp 5efeb83, #72)
                   { :style                => "position:absolute;top:0;left:0;width:95%;height:100%;",
                     :seamless             => "seamless",
-                    :scrolling            => "no",
+                    # text longer than the frame must scroll in it (#75)
+                    :scrolling            => "auto",
                     :frameborder          => "0",
                     :allowtransparency    => "true",
                     :title                => filename,
@@ -143,7 +153,7 @@ module RedmineMorePreviews
                    }.merge(options)
                 ),
                 :id    => "preview_pane",
-                :style => "position:relative;padding-top:141%;"
+                :style => pane_style
               )
             end #if
           end #def

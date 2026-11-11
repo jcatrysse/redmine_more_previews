@@ -34,4 +34,32 @@ class PreviewFrameTest < Redmine::HelperTest
     assert_equal 'OBJECT', object.name.upcase
     assert_equal 'position:absolute;top:0;left:0;width:95%;height:100%;', object['style']
   end
+
+  # port of curecodejp add99bb (#75): text and PDF frames fit the window, in
+  # both modes; a pane sized by its width (141%) was taller than the window
+  def test_text_and_pdf_panes_fit_the_window
+    %w(application/pdf text/plain image/png).each do |type|
+      %w(0 1).each do |embedding|
+        pane, _frame = frame(type, embedding)
+        assert_equal 'position:relative;height:calc(100vh - 320px);min-height:280px;', pane['style'], "#{type} #{embedding}"
+      end
+    end
+  end
+
+  # ours: html previews keep their pane (upstream's 60vh for them came with a
+  # change of its sandbox that this branch did differently)
+  def test_html_panes_keep_their_size
+    %w(0 1).each do |embedding|
+      pane, _frame = frame('text/html', embedding)
+      assert_equal 'position:relative;padding-top:141%;', pane['style'], embedding
+    end
+  end
+
+  # text longer than the frame scrolls in it: scrolling="no" left it cut off
+  def test_iframe_scrolls
+    %w(application/pdf text/plain text/html).each do |type|
+      _pane, iframe = frame(type, '1')
+      assert_equal 'auto', iframe['scrolling'], type
+    end
+  end
 end
