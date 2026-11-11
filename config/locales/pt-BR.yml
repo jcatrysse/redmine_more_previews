@@ -49,6 +49,7 @@ pt-BR:
   text_more_previews_inline_too_large:                   "A visualização integrada é grande demais. Baixe o arquivo para visualizá-lo."
   text_more_previews_inline_too_complex:                 "A visualização integrada é complexa demais para ser exibida. Baixe o arquivo para visualizá-lo."
   error_more_previews_invalid_libre_format:              "Formato de conversão do LibreOffice inválido; as configurações não foram salvas."
+  error_more_previews_unreadable_image_format:           "O ImageMagick não consegue ler %{formats} (verifique com: convert -list format, ou magick -list format no ImageMagick 7); as configurações não foram salvas."
   
   label_redmine_more_previews_plugins_settings:            "Configurações dos Plugins"
   

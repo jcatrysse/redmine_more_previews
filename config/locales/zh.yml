@@ -49,6 +49,7 @@ zh:
   text_more_previews_inline_too_large:                   "内嵌预览太大，无法显示。请下载文件查看。"
   text_more_previews_inline_too_complex:                 "内嵌预览太复杂，无法显示。请下载文件查看。"
   error_more_previews_invalid_libre_format:              "LibreOffice 转换格式无效，设置未保存。"
+  error_more_previews_unreadable_image_format:           "ImageMagick 无法读取 %{formats}（检查方法：convert -list format，ImageMagick 7 为 magick -list format），设置未保存。"
   
   label_redmine_more_previews_plugins_settings:            "插件设置"
   

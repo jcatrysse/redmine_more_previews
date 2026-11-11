@@ -50,6 +50,7 @@ en:
   text_more_previews_inline_too_large:                     "The inline preview exceeds the size limit. Download the file to view it."
   text_more_previews_inline_too_complex:                   "The inline preview is too complex to display. Download the file to view it."
   error_more_previews_invalid_libre_format:                "Invalid LibreOffice conversion format; settings were not saved."
+  error_more_previews_unreadable_image_format:            "ImageMagick cannot read %{formats} (check with: convert -list format, or magick -list format for ImageMagick 7); settings were not saved."
   
   label_redmine_more_previews_plugins_settings:            "Plugins settings"
   

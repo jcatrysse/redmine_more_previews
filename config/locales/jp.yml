@@ -49,6 +49,7 @@ jp:
   text_more_previews_inline_too_large:                   "インラインプレビューが大きすぎるため、表示できません。ファイルをダウンロードして確認してください。"
   text_more_previews_inline_too_complex:                 "インラインプレビューが複雑すぎるため、表示できません。ファイルをダウンロードして確認してください。"
   error_more_previews_invalid_libre_format:              "LibreOffice の変換形式が正しくないため、設定を保存しませんでした。"
+  error_more_previews_unreadable_image_format:           "ImageMagick が %{formats} を読めないため、設定を保存しませんでした（確認: convert -list format、ImageMagick 7 では magick -list format）。"
   
   label_redmine_more_previews_plugins_settings:            "プラグインの設定"
   

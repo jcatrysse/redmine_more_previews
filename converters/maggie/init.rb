@@ -43,6 +43,10 @@ RedmineMorePreviews::Converter.register :maggie do
                  :gif  =>    {:formats => [:png, :jpg, :gif], :mime => "image/gif",        :icon => "gif.png" },
                  :bmp  =>    {:formats => [:png, :jpg, :gif], :mime => "image/bmp",        :icon => "bmp.png" },
                  :pdf  =>    {:formats => [:png, :jpg, :gif], :mime => "application/pdf",  :icon => "pdf.png" },
+                 :heic =>    {:formats => [:png, :jpg, :gif], :mime => "image/heic" },
+                 :heif =>    {:formats => [:png, :jpg, :gif], :mime => "image/heif" },
+                 :tif  =>    {:formats => [:png, :jpg, :gif], :mime => "image/tiff" },
+                 :tiff =>    {:formats => [:png, :jpg, :gif], :mime => "image/tiff" },
             )
 end
 

@@ -49,6 +49,7 @@ ru:
   text_more_previews_inline_too_large:                   "Встроенный просмотр слишком велик. Скачайте файл для просмотра."
   text_more_previews_inline_too_complex:                 "Встроенный просмотр слишком сложен для отображения. Скачайте файл для просмотра."
   error_more_previews_invalid_libre_format:              "Недопустимый формат преобразования LibreOffice; настройки не сохранены."
+  error_more_previews_unreadable_image_format:           "ImageMagick не может прочитать %{formats} (проверьте: convert -list format или magick -list format для ImageMagick 7); настройки не сохранены."
   
   label_redmine_more_previews_plugins_settings:            "Настройки плагинов"
   

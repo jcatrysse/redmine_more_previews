@@ -49,6 +49,7 @@ fr:
   text_more_previews_inline_too_large:                   "L'aperçu intégré est trop grand. Téléchargez le fichier pour le consulter."
   text_more_previews_inline_too_complex:                 "L'aperçu intégré est trop complexe pour être affiché. Téléchargez le fichier pour le consulter."
   error_more_previews_invalid_libre_format:              "Format de conversion LibreOffice non valide ; les paramètres n'ont pas été enregistrés."
+  error_more_previews_unreadable_image_format:           "ImageMagick ne sait pas lire %{formats} (vérifier avec : convert -list format, ou magick -list format pour ImageMagick 7) ; les paramètres n'ont pas été enregistrés."
   
   label_redmine_more_previews_plugins_settings:            "Configuration des plugins"
   
