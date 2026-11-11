@@ -194,6 +194,10 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
       assert_response :success
       href = css_select('a[download="hello.txt"]').first&.[]('href')
       assert_equal '/projects/ecookbook/repository/samples/preview/sample.zip@/index.html?asset=inner%2Fhello.txt', href
+      # port of curecodejp 966c49d (#78): opened in the top window, which the
+      # sandbox allows after a click
+      assert_equal '_top', css_select('a[download="hello.txt"]').first['target']
+      assert_includes response.headers['Content-Security-Policy'], 'allow-top-navigation-by-user-activation'
       get href
       assert_response :success
       assert_equal "hello inner\n", response.body

@@ -97,7 +97,8 @@ module RedmineMorePreviews
           private :ensure_more_previews_module_enabled
 
           def send_more_preview
-            sandbox_preview Rack::Mime.mime_type(".#{params[:format]}")
+            sandbox_preview Rack::Mime.mime_type(".#{params[:format]}"),
+                            :top_navigation => plugin_html_preview?(@entry&.name || @path, :pathonly => true)
             download_name = preview_download_filename(@entry&.name || @path, @repository.preview_filename(@path, @rev, preview_params))
             # by the entry's name: its content is read by the conversion only
             preview_type  = preview_content_type(@entry&.name || @path, :pathonly => true)

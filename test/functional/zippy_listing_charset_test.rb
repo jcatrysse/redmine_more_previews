@@ -123,4 +123,37 @@ class ZippyListingCharsetTest < Redmine::ControllerTest
       assert_equal 'text/html; charset=utf-8', response.headers['Content-Type']
     end
   end
+
+  # port of curecodejp 966c49d (#78): the frame is an opaque origin, from which
+  # a browser may send no SameSite=Lax session cookie: the links open in the top
+  # window, which the sandbox allows Zippy's listing after a click only
+  def test_zippy_listing_links_open_in_the_top_window
+    Dir.mktmpdir do |dir|
+      a = attach(build_zip(File.join(dir, 'a.zip'), 'dir/' => '', 'dir/file.txt' => 'x'), 'application/zip')
+      get :more_preview, params: {id: a.id, format: 'html'}
+      assert_response :success
+      csp = response.headers['Content-Security-Policy']
+      assert_equal 'sandbox allow-downloads allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation', csp
+      link = Nokogiri::HTML.fragment(response.body).css('a').find { |l| l.text == 'file.txt' }
+      assert link, 'the entry is linked'
+      assert_equal '_top', link['target']
+
+      # the entry itself is served as before, without top navigation
+      get :more_preview, params: {id: a.id, format: 'html', asset: 'dir/file.txt'}
+      assert_response :success
+      assert_includes response.headers['Content-Disposition'], 'attachment'
+    end
+  end
+
+  # ours: other html (an uploaded page, Pass) gets no top navigation
+  def test_other_html_previews_get_no_top_navigation
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, 'page.html')
+      File.write(path, '<p>page</p>')
+      a = attach(path, 'text/html')
+      get :more_preview, params: {id: a.id, format: 'html'}
+      assert_response :success
+      assert_equal 'sandbox allow-downloads allow-popups allow-popups-to-escape-sandbox', response.headers['Content-Security-Policy']
+    end
+  end
 end

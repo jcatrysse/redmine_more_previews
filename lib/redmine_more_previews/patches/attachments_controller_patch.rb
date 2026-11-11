@@ -105,7 +105,8 @@ module RedmineMorePreviews
           private :ensure_more_previews_module_enabled
           
           def send_more_preview
-            sandbox_preview Rack::Mime.mime_type(".#{params[:format]}")
+            sandbox_preview Rack::Mime.mime_type(".#{params[:format]}"),
+                            :top_navigation => plugin_html_preview?(@attachment.diskfile)
             download_name = preview_download_filename(@attachment.filename, @attachment.preview_filename(preview_params))
             preview_type  = preview_content_type(@attachment.diskfile)
             if !preview_unsafe? && RedmineMorePreviews::Converter.cache_previews?

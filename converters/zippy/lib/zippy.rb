@@ -227,12 +227,17 @@ class Zippy < RedmineMorePreviews::Conversion
   # entry names are attacker controlled. Only names that stay inside the archive root
   # get a download link (the asset parameter is validated again server side); other
   # entries are listed by name only.
+  # The link opens in the top window: the listing's frame is sandboxed into an opaque
+  # origin, from which a browser may send no SameSite=Lax session cookie (the login
+  # page was downloaded), and the download attribute is ignored there. The response
+  # is an attachment, so the page stays (port of curecodejp 966c49d, #78; see
+  # ControllerHelper#sandbox_preview).
   #---------------------------------------------------------------------------------------
   def entry_link( name )
     basename = File.basename(RmpText.to_utf8(name))
     safe     = RmpFile.safe_relative_path( name )
     return CGI.escapeHTML(basename) unless safe
-    link_to basename, asset_link_path(safe), :download => basename
+    link_to basename, asset_link_path(safe), :download => basename, :target => "_top"
   end #def
   
   #---------------------------------------------------------------------------------------

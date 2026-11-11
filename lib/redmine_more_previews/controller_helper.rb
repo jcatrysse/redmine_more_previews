@@ -123,20 +123,29 @@ module RedmineMorePreviews
     # name only for a name (port of curecodejp ee6c728, #79)
     def preview_content_type(source, options={})
       type = Rack::Mime.mime_type(".#{params[:format]}")
-      return type unless params[:format].to_s.casecmp?('html')
-      converter = RedmineMorePreviews::Converter.responsible(source.to_s, options)
-      return type unless UTF8_PREVIEW_CONVERTERS.include?(converter&.id.to_s)
+      return type unless plugin_html_preview?(source, options)
       "#{type}; charset=utf-8"
     end #def
     private :preview_content_type
     
+    # the preview asked for is html one of those converters writes
+    def plugin_html_preview?(source, options={})
+      return false unless params[:format].to_s.casecmp?('html')
+      converter = RedmineMorePreviews::Converter.responsible(source.to_s, options)
+      UTF8_PREVIEW_CONVERTERS.include?(converter&.id.to_s)
+    end #def
+    private :plugin_html_preview?
+    
     # Previews and assets are converted user files served from Redmine's origin.
     # Sandbox them, so that a script in a converted html, svg or mail cannot act
     # in the user's Redmine session. Chrome does not render a PDF in a sandbox.
-    def sandbox_preview(type)
+    # top_navigation: the html is the plugin's own (Zippy's listing), whose links
+    # open in the top window after a click (port of curecodejp 966c49d, #78)
+    def sandbox_preview(type, top_navigation: false)
       response.headers['X-Content-Type-Options'] = 'nosniff'
       return if type.to_s == 'application/pdf'
-      response.headers['Content-Security-Policy'] = 'sandbox allow-downloads allow-popups allow-popups-to-escape-sandbox'
+      response.headers['Content-Security-Policy'] = 'sandbox allow-downloads allow-popups allow-popups-to-escape-sandbox' +
+        (top_navigation ? ' allow-top-navigation-by-user-activation' : '')
     end #def
     private :sandbox_preview
     
