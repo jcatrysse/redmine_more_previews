@@ -250,3 +250,27 @@ no security advisory) to `redmine70-migration`, with their tests:
   versions unchanged). No new CACHE_FORMAT_VERSION unless the port needs it.
 
 Built: see "Round 9" in docs/REDMINE7-MIGRATION.md.
+
+## Round 10, 2026-11-11: curecodejp/redmine_more_previews v6.1.7, v6.1.8 and v6.1.9
+
+Jan decided (2026-11-11, through the coordinator session) to port **everything** of
+https://github.com/curecodejp/redmine_more_previews v6.1.6..v6.1.9 (17 commits, no merges, no
+advisory) to `redmine70-migration`, including:
+
+- Maggie HEIC/HEIF and TIFF (aa28b8b #81, 3f866f0 #82): off after the upgrade, the settings
+  refuse a format ImageMagick cannot read, the declared-size limit (default 64 MP, 413), the
+  header checks; the HEIC/TIFF header parsing treated as security code (attacker-supplied files,
+  bounded reads, fail closed), with crafted files beyond upstream's tests where those do not
+  cover our code;
+- the process-local memory cache of sanitized inline previews (0b3e950 #71): thread-safe under
+  Puma threads and bounded (32 MiB, 1 h);
+- data: URI embedding of images in Cliff/Libre HTML previews (194c0b4 #84): content-sniffed
+  types only, the size bounds, no read outside the conversion's own output (traversal,
+  symlinks), no network fetch;
+- the Cliff charset decoding, Zippy fixes, iframe/PDF frame fixes, PDF download filename, inline
+  parser-limit notice, Vince-absent fix, repository preview image paths, and the cache format
+  bump (our own cache-format naming, as in round 8).
+- DO NOT PORT: README-only, benchmark-script and release-only commits. New locale keys in every
+  shipped locale (jp.yml and pt-BR.yml included), no new languages.
+
+Built: see "Round 10" in docs/REDMINE7-MIGRATION.md.
