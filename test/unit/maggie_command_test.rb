@@ -31,6 +31,7 @@ class MaggieCommandTest < ActiveSupport::TestCase
   TIFF = tiff_header(32, 16)
   BIGTIFF = tiff_header(32, 16, order: 'MM', big: true)
   FIXTURES = File.expand_path('../../fixtures/maggie', __FILE__)
+  RESOURCES = %w(width height area memory map disk).freeze
   # every image format enabled, as an administrator who previews all of them
   ALL_ENABLED = {'mime_types' => %w(png jpg gif bmp pdf heic heif tif tiff).
                    to_h {|ext| [ext, {'active' => '1', 'format' => 'png'}]}}.freeze
@@ -117,7 +118,7 @@ class MaggieCommandTest < ActiveSupport::TestCase
       convert, = commands(worker)
       input = convert.index {|arg| arg.end_with?(worker.source, "#{worker.source}[0]")}
       assert input, "#{name}: input"
-      %w(width height area memory map disk).each do |resource|
+      RESOURCES.each do |resource|
         limit = convert.each_cons(2).find_index {|a, b| a == '-limit' && b == resource}
         assert limit && limit < input, "#{name}: -limit #{resource} before the input"
       end

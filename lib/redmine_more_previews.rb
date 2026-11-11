@@ -105,7 +105,7 @@ module RedmineMorePreviews
       ipco  = iso_boxes(iprp.assoc('ipco')&.last.to_s) or return nil
       entries = iprp.select{|type, _| type == 'ipma' }.flat_map{|_, ipma| heif_associations(ipma, item) || (return nil) }
       return nil if entries.size > 1
-      ispes = entries.flatten.map{|index| index > 0 ? ipco[index - 1] : nil }.compact.select{|type, _| type == 'ispe' }
+      ispes = entries.flatten.filter_map{|index| ipco[index - 1] if index > 0 }.select{|type, _| type == 'ispe' }
       return nil if ispes.size > 1
       ispe  = ispes.first&.last
       return nil unless ispe && ispe.bytesize >= 12
@@ -281,7 +281,11 @@ module RedmineMorePreviews
       stdin.close
       reader = Thread.new { out.read }
       unless wait.join(imagemagick_list_timeout)
-        begin; Process.kill("KILL", windows ? wait.pid : -wait.pid); rescue SystemCallError; end
+        begin
+          Process.kill("KILL", windows ? wait.pid : -wait.pid)
+        rescue SystemCallError
+          # already ended
+        end
         wait.join
         return nil
       end

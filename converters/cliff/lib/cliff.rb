@@ -300,7 +300,8 @@ class Cliff < RedmineMorePreviews::Conversion
                elsif html
                  meta_charsets( bytes[0, META_PRESCAN] ).
                    uniq { |charset| source_encoding( charset ) }.first( META_CANDIDATES )
-               else []
+               else
+                 []
                end
     text = charsets.lazy.filter_map { |charset| transcoded( bytes, charset ) }.first || RmpText.to_utf8( bytes )
     text    = text.scrub( '?' )

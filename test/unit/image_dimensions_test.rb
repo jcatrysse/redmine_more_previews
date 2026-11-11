@@ -74,7 +74,7 @@ class ImageDimensionsTest < ActiveSupport::TestCase
   def test_a_file_with_two_meta_boxes_is_not_read
     small = heic_header({1 => [16, 16]})
     large = heic_header({1 => [10_000, 10_000]})
-    assert_nil heif(small + large[large.index('meta'.b) - 4..])
+    assert_nil heif(small + large[(large.index('meta'.b) - 4)..])
   end
 
   # a box that ends beyond the end of the file is the last one, as for libheif
@@ -84,7 +84,7 @@ class ImageDimensionsTest < ActiveSupport::TestCase
   def test_a_box_beyond_the_end_of_the_file_ends_the_walk
     header = heic_header({1 => [4000, 3000]})
     assert_equal [4000, 3000], heif(header + iso_box('mdat', "\0" * 16, size: 4096))
-    assert_equal [4000, 3000], heif(header + iso_box('mdat', "\0" * 16, size: 0) + header[header.index('meta'.b) - 4..])
+    assert_equal [4000, 3000], heif(header + iso_box('mdat', "\0" * 16, size: 0) + header[(header.index('meta'.b) - 4)..])
     assert_equal [4000, 3000], heif(header + "\0\0\0".b)
     huge = [1].pack('N') + 'mdat' + [0xFFFF_FFFF_FFFF_FFFF].pack('Q>')
     assert_nil heif(iso_box('ftyp', 'heic' + "\0\0\0\0") + huge.b + header)

@@ -110,7 +110,7 @@ class InlinePreviewCacheTest < Redmine::HelperTest
   # Puma threads share the store: every thread gets the result of its own html
   def test_threads_sharing_the_store_get_their_own_results
     results = Concurrent::Array.new
-    threads = 16.times.map do |t|
+    threads = Array.new(16) do |t|
       Thread.new do
         50.times do |i|
           n = (t * 50 + i) % 40
