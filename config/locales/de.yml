@@ -46,6 +46,7 @@ de:
   text_more_previews_busy:                               "Das Preview wird gerade erzeugt oder der Server ist ausgelastet. Bitte später erneut versuchen."
   text_more_previews_too_large:                          "Die Datei ist zu groß für ein Preview."
   text_more_previews_inline_too_large:                   "Das eingebettete Preview ist zu groß. Bitte die Datei herunterladen, um sie anzusehen."
+  text_more_previews_inline_too_complex:                 "Das eingebettete Preview ist zu komplex für die Anzeige. Bitte die Datei herunterladen, um sie anzusehen."
   error_more_previews_invalid_libre_format:              "Ungültiges LibreOffice-Konvertierungsformat; die Einstellungen wurden nicht gespeichert."
   
   label_redmine_more_previews_plugins_settings:            "Plugins Einstellungen"

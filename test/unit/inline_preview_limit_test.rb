@@ -51,4 +51,59 @@ class InlinePreviewLimitTest < Redmine::HelperTest
     ::I18n.locale = 'de'
     assert_includes more_previews_inline('x' * 262_145), 'Das eingebettete Preview ist zu groß.'
   end
+
+  # port of curecodejp 77ce987 (#70): the HTML5 parser refuses markup over its
+  # tree depth and attribute limits by raising, far below the size limit; the
+  # page must not fail, and the input is never returned unsanitized. Redmine 7
+  # keeps ActionView's HTML4 sanitizer (no load_defaults), which does not
+  # raise; an installation (or a later Redmine) choosing the HTML5 vendor
+  # does: these tests use it
+  def with_html5_sanitizer
+    self.class.stubs(:safe_list_sanitizer).returns(Rails::HTML5::SafeListSanitizer.new)
+    yield
+  end
+
+  def test_inline_preview_shows_a_notice_for_nesting_over_the_parser_limit
+    with_html5_sanitizer do
+      output = more_previews_inline('<script>alert(1)</script>' + '<div>' * 500 + 'x' + '</div>' * 500)
+
+      assert_equal '<p class="nodata">The inline preview is too complex to display. Download the file to view it.</p>', output
+      assert output.html_safe?
+    end
+  end
+
+  def test_inline_preview_shows_a_notice_for_attributes_over_the_parser_limit
+    with_html5_sanitizer do
+      attributes = (0...500).map { |i| %(a#{i}="1") }.join(' ')
+      output = more_previews_inline("<script>alert(1)</script><span #{attributes}>x</span>")
+
+      assert_equal '<p class="nodata">The inline preview is too complex to display. Download the file to view it.</p>', output
+      assert output.html_safe?
+    end
+  end
+
+  def test_inline_preview_still_sanitizes_nesting_below_the_parser_limit
+    with_html5_sanitizer do
+      output = more_previews_inline('<script>alert(1)</script>' + '<div>' * 300 + 'x' + '</div>' * 300)
+
+      assert_includes output, '<div>'
+      assert_not_includes output, '<script>'
+      assert_not_includes output, 'too complex'
+    end
+  end
+
+  # ours: Redmine 7's own sanitizer keeps deep markup and still removes scripts
+  def test_redmine_sanitizer_sanitizes_deep_nesting
+    output = more_previews_inline('<script>alert(1)</script>' + '<div>' * 500 + 'x' + '</div>' * 500)
+
+    assert_includes output, '<div>'
+    assert_not_includes output, '<script>'
+  end
+
+  def test_parser_limit_notice_is_translated
+    with_html5_sanitizer do
+      ::I18n.locale = 'de'
+      assert_includes more_previews_inline('<div>' * 500), 'Das eingebettete Preview ist zu komplex'
+    end
+  end
 end

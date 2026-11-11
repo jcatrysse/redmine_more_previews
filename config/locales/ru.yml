@@ -46,6 +46,7 @@ ru:
   text_more_previews_busy:                               "Просмотр создаётся или сервер занят. Повторите попытку позже."
   text_more_previews_too_large:                          "Файл слишком велик для просмотра."
   text_more_previews_inline_too_large:                   "Встроенный просмотр слишком велик. Скачайте файл для просмотра."
+  text_more_previews_inline_too_complex:                 "Встроенный просмотр слишком сложен для отображения. Скачайте файл для просмотра."
   error_more_previews_invalid_libre_format:              "Недопустимый формат преобразования LibreOffice; настройки не сохранены."
   
   label_redmine_more_previews_plugins_settings:            "Настройки плагинов"

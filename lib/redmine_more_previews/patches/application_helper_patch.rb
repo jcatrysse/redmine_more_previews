@@ -44,10 +44,18 @@ module RedmineMorePreviews
             if html.bytesize > RedmineMorePreviews::Patches::ApplicationHelperPatch::MAX_INLINE_PREVIEW_HTML_BYTES
               return content_tag(:p, l(:text_more_previews_inline_too_large), :class => "nodata")
             end
-            sanitize(html,
-              :tags       => ActionView::Base.sanitized_allowed_tags.to_a + RedmineMorePreviews::Patches::ApplicationHelperPatch::INLINE_TAGS,
-              :attributes => ActionView::Base.sanitized_allowed_attributes.to_a + %w(colspan rowspan align download style)
-            )
+            begin
+              sanitize(html,
+                :tags       => ActionView::Base.sanitized_allowed_tags.to_a + RedmineMorePreviews::Patches::ApplicationHelperPatch::INLINE_TAGS,
+                :attributes => ActionView::Base.sanitized_allowed_attributes.to_a + %w(colspan rowspan align download style)
+              )
+            rescue ArgumentError => e
+              # the HTML5 parser raises on markup over its tree depth or attribute
+              # limits: keep the page, never fall back to the input (port of
+              # curecodejp 77ce987, #70)
+              Rails.logger.warn("Inline preview not sanitized: #{e.message}")
+              content_tag(:p, l(:text_more_previews_inline_too_complex), :class => "nodata")
+            end
           end #def
           
           # query parameters the preview views may forward to the converters.

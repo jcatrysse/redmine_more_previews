@@ -81,6 +81,23 @@ class AttachmentsMoreAssetTest < Redmine::ControllerTest
     end
   end
 
+  # port of curecodejp 77ce987 (#70): html over the parser's limits, far below
+  # the size limit, leaves the attachment page with a notice
+  def test_inline_preview_over_the_parser_limit_preserves_attachment_page
+    Dir.mktmpdir do |dir|
+      a = attach(build_tar(File.join(dir, 'deep.tar'), 'safe.txt' => 'safe'))
+      with_zippy_format('tar', 'inline') do
+        a.class.any_instance.stubs(:more_preview).returns('<div>' * 500 + 'x' + '</div>' * 500)
+        # the HTML5 vendor raises on this (Redmine 7 keeps HTML4, see inline_preview_limit_test)
+        ActionView::Base.stubs(:safe_list_sanitizer).returns(Rails::HTML5::SafeListSanitizer.new)
+        get :show, params: {id: a.id, filename: a.filename, format: 'html'}
+        assert_response :success
+        assert_select 'p.nodata', text: 'The inline preview is too complex to display. Download the file to view it.'
+        assert_includes response.body, a.filename
+      end
+    end
+  end
+
   # ours: a refusal at a converter's limit says which, as the Cliff hook does
   def test_refused_inline_preview_says_why_in_the_attachment_page
     Dir.mktmpdir do |dir|

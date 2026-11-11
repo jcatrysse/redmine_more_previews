@@ -77,6 +77,23 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  # port of curecodejp 77ce987 (#70): html over the parser's limits leaves the
+  # entry page with a notice (upstream's stub on a Filesystem repository; ours
+  # on the git repository of this test)
+  def test_inline_entry_over_the_parser_limit_leaves_a_notice
+    with_converters(CONVERTERS) do
+      Repository::Git.any_instance.stubs(:more_preview).returns('<div>' * 500 + 'x' + '</div>' * 500)
+      # the HTML5 vendor raises on this (Redmine 7 keeps HTML4, see inline_preview_limit_test)
+      ActionView::Base.stubs(:safe_list_sanitizer).returns(Rails::HTML5::SafeListSanitizer.new)
+      log_user('jsmith', 'jsmith')
+      get '/projects/ecookbook/repository/samples/entry/sample.md'
+      assert_response :success
+      assert_select '#preview_repository_entry_top + div p.nodata',
+                    :text => 'The inline preview is too complex to display. Download the file to view it.'
+      assert_select 'h2'
+    end
+  end
+
   def test_more_preview_returns_the_conversion
     with_converters(CONVERTERS) do
       log_user('jsmith', 'jsmith')
