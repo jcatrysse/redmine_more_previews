@@ -20,7 +20,7 @@ what is left. Written 2026-10-06 from a measured analysis (report at the bottom)
 | Upstream | HugoHasenbein/redmine_more_previews main @ 0bca937b36c56e3114e582b9bdf3384814d394ca (2025-02-13, 5.0.9) |
 | Runs on Redmine 7 as is | NEE (boot) |
 | Runs on Redmine 7 after this branch | JA: tests and e2e green on PostgreSQL 16 (see "Results"); also with the other GEOxyz plugins, apart from their own defects listed there |
-| Migration session | done 2026-10-06; Jan's decisions of 2026-10-07, round 4 (2026-10-11), round 5 (2026-10-12, security fixes of curecodejp 6.1.2: conversion limits, Vince) round 6 (2026-10-19, curecodejp 6.1.3: Libre in a bubblewrap sandbox, debug redaction, module off, Cliff 413, repository cache removal) round 7 (2026-10-29, curecodejp 6.1.4: Vince, Maggie without Ghostscript, Libre image links, cache format) round 8 (2026-11-02, curecodejp 6.1.5: Vince in a child process (GHSA-hm82), Cliff extensionless attachments, cached Cliff headers, legacy Cliff files) and round 9 (2026-11-03, curecodejp 6.1.6: inline html and Cliff fragments limited to 256 KiB, no 304 for old fragments) built (see "Decided by Jan") |
+| Migration session | done 2026-10-06; Jan's decisions of 2026-10-07, round 4 (2026-10-11), round 5 (2026-10-12, security fixes of curecodejp 6.1.2: conversion limits, Vince) round 6 (2026-10-19, curecodejp 6.1.3: Libre in a bubblewrap sandbox, debug redaction, module off, Cliff 413, repository cache removal) round 7 (2026-10-29, curecodejp 6.1.4: Vince, Maggie without Ghostscript, Libre image links, cache format) round 8 (2026-11-02, curecodejp 6.1.5: Vince in a child process (GHSA-hm82), Cliff extensionless attachments, cached Cliff headers, legacy Cliff files) round 9 (2026-11-03, curecodejp 6.1.6: inline html and Cliff fragments limited to 256 KiB, no 304 for old fragments) and round 10 (2026-11-11, curecodejp 6.1.7 to 6.1.9: Cliff charsets, inline sanitizer cache, frames, PDF names, Zippy, Maggie HEIC/TIFF, data: URIs; Ruby 4.0.9) built (see "Decided by Jan") |
 | Upstream sync | UPSTREAM DOOD: nothing upstream; fork already equals upstream 5.0.9 + 2 own commits; claude/redmine7-rails8-compat 4eb8dea cherry-picked |
 | After sync | n.v.t. |
 | Complexity (1 trivial .. 5 rewrite) | 3 |
@@ -274,6 +274,8 @@ migration sessions; this plugin's scenarios pass there):
 - Round 9 (2026-11-03): own review of `ce95f1c..4f079c3`: no defect; recorded under "Found, not changed" in
   "Round 9".
 - Round 9: OpenAI review (gpt-5) of `ce95f1c..4f079c3`, `docs/reviews/openai-2026-11-03-4f079c3.md`: no findings.
+- Round 10 (2026-11-11): own review of `ac52a8b..HEAD`: found the repository top-navigation decision by name (fixed in `8954813`), the e2e found `fa15a01` and `47b77c4`; the rest under "Found, not changed" in "Round 10".
+- Round 10: OpenAI review (gpt-5) of `ac52a8b..8954813`, `docs/reviews/openai-2026-11-11-8954813.md`: 6 findings, none changed code, a Resolution line each.
 
 ### Not tested here (needs production or is out of reach)
 
@@ -702,6 +704,95 @@ Found, not changed:
 - The oversized-mail page (6ce4793) still shows nothing in the preview frame, whose 413 a browser
   does not render; the reason above it says why (`round9-huge-*.png`, as in round 8).
 
+**Round 10, 2026-11-11: curecodejp/redmine_more_previews v6.1.7, v6.1.8 and v6.1.9** (17 commits
+v6.1.6..v6.1.9, no merges, no advisory). Jan, 2026-11-11 (coordinator session;
+`docs/DECISIONS-2026-10-07.md`, "Round 10"): port everything, except README-only, benchmark and
+release-only commits. Ported by hand (cherry-pick of upstream's commit, conflicts resolved on our
+code), each commit names the upstream commit; every fix has a test that fails without it, seen by
+running each commit's changed test files with its parent's code and its own `test/` directory
+(Redmine 7.0-stable-GEOxyz, Ruby 4.0.9, PostgreSQL 16; counts per commit below).
+
+| commit here | what | tests, red on the parent |
+|---|---|---|
+| `db23ef5` | Cliff decodes every text and html body: transfer encoding, then the part's charset to UTF-8, strictly (a mismatch falls back to the guess); Shift_JIS / ISO-2022-JP as Windows-31J / CP50221; an html part without MIME charset tries at most three distinct `<meta>` charsets of its first 4096 characters (tokenized: comments, raw-text elements, attributes skipped) and its `<meta>` is rewritten to UTF-8, also unsafe | cliff_body_test (upstream's): 9 failures |
+| `a47763a` | **ADAPT** `more_previews_inline` rescues the HTML5 parser's ArgumentError (tree depth, attributes) with a notice `text_more_previews_inline_too_complex` (10 locales). Redmine 7 keeps ActionView's HTML4 sanitizer (no load_defaults), which does not raise; the tests use the HTML5 vendor. Under HTML4 libxml2 silently drops what lies deeper than 256 levels (e2e `round10-inline-deep.png`) | inline_preview_limit_test, attachments_more_asset_test, repository_previews_test: 1 failure, 4 errors |
+| `81c4216` | sanitized inline html kept in `INLINE_PREVIEW_CACHE`, an `ActiveSupport::Cache::MemoryStore` (32 MiB, entries 1 h), key sub-URI + SHA-256 of the html; MemoryStore synchronizes every access with its monitor (Puma threads), no class variable or memoised hash; nothing kept or read while the preview cache is off, parser failures never kept; the plugin's test helper clears it before each test. e2e: a ~200 KiB inline preview, page views 903, 57, 50, 50 ms | inline_preview_cache_test (upstream's + bounds, expiry, 16 threads): does not load on the parent (NameError INLINE_PREVIEW_CACHE) |
+| `f67b8a1` | a converted PDF is sent as `<original basename>.pdf` (index.pdf before), attachments and repository files, cached or not; the name is part of a PDF's ETag | preview_download_filename_test (upstream's), pdf_download_filename_test (upstream's html_preview_downloads_test cases), repository_previews_test: 4 failures, 4 errors |
+| `4d39dcc` | Zippy entries named like the listing (`index.html`, `index.html/x`) stored as `index.html.entry...` and served; for converters that write assets with the preview an asset of the preview's name is refused in `Conversion#preview` (replaces our controller check `preview_asset?`) | attachments_more_asset_test (upstream's 5), repository_previews_test, conversion_asset_name_test (upstream's 3), preview_reload_failures_test: 9 failures |
+| `84e0484` | **ADAPT** the `<iframe>` fills its pane (`height:100%`) instead of 16px plus a load handler that set the window height: a PDF frame never fired it and stayed a strip under "Loading..." (seen in Chromium on our code) | preview_frame_test (ours): 1 failure |
+| `4411971` | **ADAPT** non-HTML previews (text, PDF, images in a frame) get a pane of `calc(100vh - 320px)` (min 280px) in both embeddings, the iframe scrolls; was `padding-top:141%` (1870px on a 900px window) and `scrolling="no"`. HTML previews keep their pane (upstream's 60vh for them belongs to its sandbox rework). Vince-absent half: ours since round 5 (`RmpText.to_utf8`), upstream's test as guard | preview_frame_test, attachments_more_asset_test: 2 failures |
+| `3618315` | an image preview that fails to load shows `text_more_previews_image_failed` (10 locales) instead of a broken image (`onerror` attribute) | attachments_more_asset_test, repository_previews_test: 2 failures |
+| `92a25c8` | Zippy's listing sent as `text/html; charset=utf-8` (in the ETag); Pass keeps the bare type | zippy_listing_charset_test (upstream's 3 + ours), repository_previews_test: 4 failures |
+| `60c7c92` | **ADAPT** Zippy's links `target="_top"`, and Zippy's listing alone gets `allow-top-navigation-by-user-activation` in our CSP header (Redmine 7's session cookie is SameSite=Lax; e2e: download from the frame in e2e-private works) | zippy_listing_charset_test, repository_previews_test: 2 failures |
+| `643a2c0` | Maggie HEIC/HEIF, TIFF: new extensions inactive until enabled; converted only when enabled, the start of the file is the format (ftyp with a HEVC brand and no AVIF brand in the first 256 bytes; TIFF/BigTIFF magic) and ImageMagick lists a reading coder (`-list format` once per program and process, 10 s, a Mutex around the module hash); first image/page, EXIF orientation dropped, TIFF auto-oriented and sRGB; the settings refuse a format without coder (`error_more_previews_unreadable_image_format`, 10 locales); of two extensions of one type a file gets its own extension's settings | upstream's tests and fixtures (maggie_command_test, image_magic_test, converter_mime_extension_test, plugin_settings_image_formats_test): 9 failures, 31 errors |
+| `0f1ae46` | HEIC/TIFF only when the declared size can be read and is at most `max_megapixels` (default 64, Maggie setting; 413 beyond): HEIC at most 16 top-level boxes, exactly one meta box of at most 1 MiB, the ispe of the primary item; TIFF first IFD, one value each, no duplicate tag, at most 4096 entries; Maggie locale keys in all 10 Maggie locales | image_dimensions_test and the others (upstream's): 6 failures, 15 errors |
+| `2564936` | **ours** HEIC header fail closed on two pitm/iprp/ipco boxes, the primary item listed twice in ipma, two ispe; the ImageMagick command of HEIC/TIFF runs after `ulimit -v` of 1 GiB + 24 MiB per megapixel (2.5 GiB for 64; a shell that cannot set it stops). Measured: a HEIC declaring 64x64 and coding 9000x9000 passed the 64 MP check and libheif 1.17.6 decoded it whole (1.4 GB resident); a coded 64 MP HEIC needs about 2 GiB | maggie_heif_hardening_test: 6 of 11 failures (the 5 others guards: 413 before ImageMagick, no limit for png/pdf, failing ulimit stops, 64 MP still converts, header builder) |
+| `c66a024` | Cliff and Libre embed the images of html previews as data: URIs (the frame's opaque origin sends no session cookie: in e2e-private a Libre image had naturalWidth 0 on our code): only a regular file inside the conversion's output (realpath), relative src without scheme/query/fragment/absolute/`..` (entity- and percent-decoded), raster types by content (png, jpeg, gif, webp, bmp; no svg), within max_output (Cliff also twice the email). Repository asset route's leading "/": ours since round 8, upstream's tests as guards. Our round 7 Libre image-link test now expects the embedded image | rmp_data_uri_test, cliff_inline_images_test, html_preview_images_test (upstream's): do not load on the parent (NameError RmpDataUri) |
+| `84e7bb8` | **ours** a hard-linked file (`nlink > 1`) is not embedded | rmp_data_uri_test: 1 failure (others guards: symlinked dir, encoded traversal, remote/file:/drive sources, FIFO) |
+| `2596d66` | cache format `converter-fixes-v3` (ours; upstream maintenance-6.1.7-v1, -6.1.9-v1) | conversion_debug_redaction_test#test_cached_output_from_round_8_is_rebuilt and the marker tests: 4 failures |
+| `26eca2f` | RuboCop: the new Lint and Performance offenses of this round fixed | (no behaviour) |
+| `fa15a01` | **ours** found by the e2e: since `db23ef5` Cliff writes every body in UTF-8, also html without `<meta>`; Chromium showed "cafÃ©" for a Windows-1252 email. Cliff's html is sent with `charset=utf-8` too; top navigation stays Zippy's alone | zippy_listing_charset_test: 1 failure |
+| `47b77c4` | **ours** found by the e2e: upstream's coder check is an `icon-ok` span without image on Redmine 7: the sprite added | plugin_settings_image_formats_test: 1 failure |
+| `8954813` | **ours** own review: for repository entries `60c7c92`/`92a25c8` decided Zippy by the name; a file `evil.zip` holding html (Pass) got top navigation. Now by the entry's first 64 KiB, as the conversion decides | repository_previews_test: 1 failure |
+| `e4ec017`, later | e2e `round10.mjs` | see below |
+
+Upstream commits v6.1.6..v6.1.9 (17, no merges), verdict per commit:
+
+| upstream | subject | verdict |
+|---|---|---|
+| 3b8a5ea | Convert Cliff email bodies from their charset (#68) | PORT `db23ef5`; its cache bump as `2596d66` |
+| 4cdbbb6 | Separate inline sanitizer benchmark from size-limit rejection (#69) | DO NOT PORT (Jan): benchmark script (not on this branch since round 9) |
+| 77ce987 | Keep the page when inline HTML exceeds the parser's limits (#70) | ADAPT `a47763a` (HTML4 sanitizer on Redmine 7) |
+| 0b3e950 | Cache sanitized inline previews in memory (#71) | PORT `81c4216` |
+| 5efeb83 | Restore full-height PDF and office preview iframes (#72) | ADAPT `84e0484` (our frame code) |
+| 31d1001 | Use original document filenames for converted PDF downloads (#73) | PORT `f67b8a1` |
+| 0b9df4e | Prepare v6.1.7 release with Cliff 1.1.6 (#74) | DO NOT PORT (Jan): release, versions |
+| add99bb | Make text and PDF previews scroll in a window-sized frame; run inline previews without Vince (#75) | ADAPT `4411971` (Vince half already ours, guard test) |
+| e1a2d25 | Show a message when an image preview fails to load (#76) | PORT `3618315` (8 more locales) |
+| 64315f4 | Serve Zippy entries named like the HTML listing (#77) | PORT `4d39dcc` |
+| 966c49d | Open Zippy listing links in the top window (#78) | ADAPT `60c7c92` (CSP header only; after #79, it reuses its converter check); fixed for repositories in `8954813`; CI change not ported |
+| ee6c728 | Send the Zippy listing as UTF-8 (#79) | PORT `92a25c8`; extended to Cliff `fa15a01` |
+| 0f0de05 | Prepare v6.1.8 release with Zippy 1.1.6 (#80) | DO NOT PORT (Jan): release |
+| aa28b8b | Preview HEIC/HEIF and TIFF in Maggie (#81) | PORT `643a2c0` (CI workflow change and converter version not ported); icon `47b77c4` |
+| 3f866f0 | Bound the size of HEIC and TIFF images Maggie converts (#82) | PORT `0f1ae46`; hardened `2564936` |
+| 194c0b4 | Embed the images of HTML previews as data: URIs (#84) | PORT `c66a024` (repository route part already ours); hardened `84e7bb8`; cache `2596d66` |
+| 1fe781e | Prepare v6.1.9 release (#83) | DO NOT PORT (Jan): release |
+
+Tests of upstream left out: none of the new ones. Files that exist only upstream
+(html_preview_downloads_test, repositories_more_asset_test, conversion_asset_test,
+inline_preview_scrubber_test, html_preview_sandbox_test) went into our files, named in the table.
+maggie_command_test is upstream's file as of 3f866f0 (new here; its older cases pass on ours).
+
+Results (2026-11-11, Redmine 7.0-stable-GEOxyz, Rails 8.1, **Ruby 4.0.9**, PostgreSQL 16.15,
+ImageMagick 6.9.12 with libheif 1.17.6 + libde265 and libtiff 4.5.1, LibreOffice in bubblewrap):
+- Plugin suite: 609 runs, 4759 assertions, 0 failures, 0 errors, 2 skips (one is the Maggie PDF case: no Ghostscript in this container); before the round on the same setup 607 runs at the cache-format commit, the new tests included.
+- Real HEIC/HEIF/TIFF conversions ran (0 skips in the Maggie tests), the crafted ones included.
+- RuboCop (Redmine's `.rubocop.yml`) on the 41 changed Ruby files: no new Lint or Performance
+  offense. On the 39 files with offenses: 1821 before the round, 2126 after (net +320 by cop), all style and layout cops where the plugin's own style differs from
+  Redmine's (spaces inside parentheses 128, guard-clause blank lines, `end #def`, `#unloadable`,
+  `File.expand_path('../x', __FILE__)` in tests) or upstream's code verbatim; left as the plugin
+  writes them (CLAUDE.md: minimal diffs in this plugin's style).
+- e2e `round10.mjs`, production mode: 20 screenshots, 0 problems, every screenshot looked at (`docs/e2e/round10*.png`, `round10.md`). The first run had 4 problems: a Windows-1252 email shown as "cafÃ©" (fixed in `fa15a01`) and three mistakes of the scenario itself (a wrong JIS byte, a remembered failure, Libre left on pdf); the Maggie settings screenshot showed the coder checks without icon (`47b77c4`).
+- OpenAI review (gpt-5) of `ac52a8b..8954813`, `docs/reviews/openai-2026-11-11-8954813.md`: 6
+  findings, none changed code; one Resolution line each (the CSP/charset decision deliberately
+  follows the conversion's converter choice; the "blocker" was a diff-hunk artefact).
+
+Found, not changed:
+- Under Redmine 7's HTML4 sanitizer, libxml2 drops content nested deeper than 256 levels without a
+  notice (the page stays); the "too complex" notice appears only under the HTML5 vendor.
+- The first `-list format` of a process holds a Mutex while it runs (at most 10 s): other threads
+  that ask for it wait; once per process.
+- A HEIC grid image's canvas comes from its `grid` box, not from `ispe`: only the address-space
+  limit of `2564936` bounds it (as a lying ispe). The limit is approximate (about the configured
+  megapixels, not exact).
+- Concurrent first views of the same inline preview both sanitize it (MemoryStore does not lock
+  during the block); harmless.
+- Repository entries named for Zippy or Cliff are read once more (64 KiB of the cat) per preview
+  request to choose the converter by content.
+- Not tested here: Firefox and Safari (only Chromium is installed); the SameSite behaviour of the
+  sandboxed frame was seen in Chromium only (downloads from the frame worked there before
+  `60c7c92`, images did not load before `c66a024`). ImageMagick 7 (`magick`) not run.
+
 ## After the upgrade (production)
 
 Actions the person doing the upgrade must take, or know about, for this plugin:
@@ -723,9 +814,16 @@ Actions the person doing the upgrade must take, or know about, for this plugin:
   ImageMagick's `policy.xml` the coders PS, PS2, PS3, EPS, EPI, EPSI, EPSF, MVG, MSL, TEXT, URL, HTTP,
   HTTPS and FTP disabled (from curecodejp's README; they do not stop PostScript reaching Ghostscript
   through the PDF coder, which Maggie's start-of-file check does).
-- Round 7 changed the cache format (`converter-fixes-v1`), round 8 again (`converter-fixes-v2`):
+- Round 7 changed the cache format (`converter-fixes-v1`), round 8 again (`converter-fixes-v2`), round 10 again (`converter-fixes-v3`):
   previews stored before are converted again on their next view; the old files stay on disk until
   the purge below or the daily clean.
+- Maggie HEIC/HEIF and TIFF (round 10): off until an administrator ticks heic, heif, tif or tiff
+  for Maggie (and Maggie itself is off after the hand-over task). If wanted: `apt install
+  libheif1 libheif-plugin-libde265` (HEVC decoder; without it ImageMagick lists HEIC but decodes
+  nothing) and libtiff (with ImageMagick); the settings refuse a format the `convert` Redmine runs
+  cannot read and show a check per coder. Largest image 64 megapixels by default; a HEIC/TIFF
+  conversion runs with an address space of 1 GiB + 24 MiB per megapixel (2.5 GiB at 64), on top of
+  the memory plan below, per conversion at once.
 - Vince (round 8, GHSA-hm82): a vCard is parsed in a child process stopped at 512 MiB of memory
   growth and the conversion timeout; vCards over 20 MiB are refused (413). Each Vince conversion
   forks like Cliff's; the memory plan above covers it (Vince's limit is half Cliff's).
