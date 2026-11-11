@@ -171,10 +171,9 @@ module RedmineMorePreviews
             # a relative link in a preview served at ...@/index.html asks for
             # ...@/<asset>: that one slash belongs to the route
             @asset = RedmineMorePreviews::Lib::RmpFile.safe_relative_path(@asset.delete_prefix("/"))
-            # the format of the preview as Repository#preview_format finds it, from
-            # the entry's name, without asking the SCM for the entry
-            extension = File.extname(@path.to_s)[1..].to_s.downcase
-            render_404 unless preview_asset?(@asset, RedmineMorePreviews::Converter.conversion_extension(extension))
+            # an asset of the preview's name is decided by the converter (Conversion#preview,
+            # Conversion#stored_asset_name; port of curecodejp 64315f4, #77)
+            render_404 if @asset.blank?
           end #def
           private :find_path_param
           

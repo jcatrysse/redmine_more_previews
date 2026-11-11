@@ -179,10 +179,9 @@ module RedmineMorePreviews
             @asset = [@asset, params[:assetformat]].compact.join(".").presence
             return if @asset.nil?
             @asset = RedmineMorePreviews::Lib::RmpFile.safe_relative_path(@asset)
-            # the preview itself is stored as index.<format> in the same directory:
-            # an asset of that name would be read, and remembered as failed, as the
-            # preview (see ControllerHelper#preview_asset?)
-            render_404 unless preview_asset?(@asset, @attachment.preview_format)
+            # an asset of the preview's name is decided by the converter (Conversion#preview,
+            # Conversion#stored_asset_name; port of curecodejp 64315f4, #77)
+            render_404 if @asset.blank?
           end #def
           private :find_asset_param
         end #base

@@ -116,6 +116,34 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  # port of curecodejp 64315f4 (#77), upstream's repository test on our git
+  # repository: an entry of the listing's name is served, the listing stays
+  def test_zip_entry_named_as_the_listing_is_served_and_the_listing_stays
+    Dir.mktmpdir do |tmp|
+      build_zip(File.join(tmp, 'b.zip'), 'index.html' => 'the entry')
+      FileUtils.cp(File.join(tmp, 'b.zip'), @dir)
+    end
+    system('git', '-C', @dir, 'add', 'b.zip', exception: true, out: File::NULL, err: File::NULL)
+    system('git', '-C', @dir, '-c', 'user.name=Test', '-c', 'user.email=test@example.net', 'commit', '-q', '-m', 'b',
+           exception: true, out: File::NULL, err: File::NULL)
+    @repository.fetch_changesets
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get '/projects/ecookbook/repository/samples/preview/b.zip@/index.html'
+      assert_response :success
+      assert_select 'a', text: 'index.html'
+
+      get '/projects/ecookbook/repository/samples/preview/b.zip@/index.html', params: { asset: 'index.html' }
+      assert_response :success
+      assert_equal 'the entry', response.body
+      assert_includes response.headers['Content-Disposition'], 'attachment'
+
+
+      get '/projects/ecookbook/repository/samples/preview/b.zip@/index.html'
+      assert_select 'a', text: 'index.html'
+    end
+  end
+
   def test_more_preview_returns_the_conversion
     with_converters(CONVERTERS) do
       log_user('jsmith', 'jsmith')
