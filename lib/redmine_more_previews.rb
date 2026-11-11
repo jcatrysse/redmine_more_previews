@@ -93,14 +93,21 @@ module RedmineMorePreviews
       meta = heif_meta(io)
       return nil unless meta && meta.bytesize >= 4
       boxes = iso_boxes(meta, 4) or return nil
+      # ours: a box libheif takes the first of, or an item it finds twice, is not
+      # guessed at: such a file is not read (fail closed)
+      return nil unless heif_single?(boxes, 'pitm') && heif_single?(boxes, 'iprp')
       pitm  = boxes.assoc('pitm')&.last
       iprp  = boxes.assoc('iprp')&.last
       return nil unless pitm && iprp && pitm.bytesize >= 6
       item  = pitm.getbyte(0) == 0 ? pitm[4, 2].unpack1('n') : pitm[4, 4].to_s.unpack1('N')
       iprp  = iso_boxes(iprp) or return nil
+      return nil unless heif_single?(iprp, 'ipco')
       ipco  = iso_boxes(iprp.assoc('ipco')&.last.to_s) or return nil
-      indices = iprp.select{|type, _| type == 'ipma' }.flat_map{|_, ipma| heif_associations(ipma, item) || (return nil) }
-      ispe  = indices.map{|index| index > 0 ? ipco[index - 1] : nil }.compact.find{|type, _| type == 'ispe' }&.last
+      entries = iprp.select{|type, _| type == 'ipma' }.flat_map{|_, ipma| heif_associations(ipma, item) || (return nil) }
+      return nil if entries.size > 1
+      ispes = entries.flatten.map{|index| index > 0 ? ipco[index - 1] : nil }.compact.select{|type, _| type == 'ispe' }
+      return nil if ispes.size > 1
+      ispe  = ispes.first&.last
       return nil unless ispe && ispe.bytesize >= 12
       size = ispe[4, 8].unpack('NN')
       size.all?(&:positive?) ? size : nil
@@ -156,13 +163,21 @@ module RedmineMorePreviews
   end #def
   private_class_method :iso_boxes
 
-  # the (1-based) property indices an "ipma" box associates with the item,
+  # at most one box of the type among boxes
+  def self.heif_single?(boxes, type)
+    boxes.count{|box_type, _| box_type == type } <= 1
+  end #def
+  private_class_method :heif_single?
+
+  # the (1-based) property indices an "ipma" box associates with the item, one
+  # list for each entry of the item (ours: all of them, not the first only),
   # nil when the box is cut short
   def self.heif_associations(ipma, item)
     return nil if ipma.bytesize < 8
     version, flags = ipma.getbyte(0), ("\0".b + ipma[1, 3]).unpack1('N')
     id_size, index_size = (version < 1 ? 2 : 4), (flags & 1 == 1 ? 2 : 1)
     offset = 8
+    found  = []
     ipma[4, 4].unpack1('N').times do
       return nil if offset + id_size + 1 > ipma.bytesize
       id = ipma[offset, id_size].unpack1(id_size == 2 ? 'n' : 'N')
@@ -170,11 +185,11 @@ module RedmineMorePreviews
       offset += id_size + 1
       return nil if offset + count * index_size > ipma.bytesize
       if id == item
-        return ipma[offset, count * index_size].unpack(index_size == 2 ? 'n*' : 'C*').map{|value| value & (index_size == 2 ? 0x7fff : 0x7f) }
+        found << ipma[offset, count * index_size].unpack(index_size == 2 ? 'n*' : 'C*').map{|value| value & (index_size == 2 ? 0x7fff : 0x7f) }
       end
       offset += count * index_size
     end
-    []
+    found
   end #def
   private_class_method :heif_associations
 

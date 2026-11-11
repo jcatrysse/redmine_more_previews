@@ -74,6 +74,17 @@ class Maggie < RedmineMorePreviews::Conversion
   # A converter setting overrides it.
   SIZE_LIMITS = {'max_megapixels' => 64}.freeze
   
+  # ours: what an image declares is not what it codes. A HEIC file declaring
+  # 64x64 in its ispe property and coding 9000x9000 passed the check above and
+  # was decoded whole by libheif 1.17.6 (1.4 GB resident). The ImageMagick command
+  # of a HEIC or TIFF image therefore runs with an address-space limit that
+  # follows max_megapixels: 1 GiB and 24 MiB per megapixel (2.5 GiB for 64; a
+  # coded 64 megapixel HEIC image needs about 2 GiB with ImageMagick 6.9.12).
+  # It bounds the image a lying header gets decoded to about the limit, not
+  # exactly: the conversion fails, the server does not run out of memory.
+  ADDRESS_SPACE_BASE_KIB          = 1024 * 1024
+  ADDRESS_SPACE_PER_MEGAPIXEL_KIB = 24 * 1024
+  
   # the formats (labels) whose coder ImageMagick lacks among the given extensions
   def self.unreadable_formats( extensions )
     IMAGE_FORMATS.values.
@@ -102,7 +113,7 @@ class Maggie < RedmineMorePreviews::Conversion
     when *IMAGE_FORMAT_MIMES
       format = IMAGE_FORMATS.values.find{|f| f[:mimes].include?(mime_type) }
       if readable?(format) && within_limits?(format)
-        "#{convert_command} -density 72x72 #{shell_quote "#{format[:coder].downcase}:#{source}[0]"} #{format[:options]} -resample #{get_density}x#{get_density} #{shell_quote "#{preview_format}:#{output}"}"
+        "#{address_space_limit}#{convert_command} -density 72x72 #{shell_quote "#{format[:coder].downcase}:#{source}[0]"} #{format[:options]} -resample #{get_density}x#{get_density} #{shell_quote "#{preview_format}:#{output}"}"
       end
       
     when "application/pdf"
@@ -137,6 +148,13 @@ class Maggie < RedmineMorePreviews::Conversion
             "#{File.basename(source)} declares #{width}x#{height} pixels, more than #{limit('max_megapixels')} megapixels"
     end
     true
+  end #def
+  
+  # the shell's ulimit before the command (see ADDRESS_SPACE_BASE_KIB): a shell
+  # that cannot set it stops there; none on Windows, which has no ulimit
+  def address_space_limit
+    return "" if Redmine::Platform.mswin?
+    "ulimit -v #{ADDRESS_SPACE_BASE_KIB + limit('max_megapixels') * ADDRESS_SPACE_PER_MEGAPIXEL_KIB} || exit 1; "
   end #def
   
   def limit( key )

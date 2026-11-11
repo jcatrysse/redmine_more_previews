@@ -50,3 +50,15 @@ convert \( -size 16x16 xc:red -size 16x16 xc:blue +append \) \( -size 8x8 xc:lim
 convert -size 16x16 xc:red -size 16x16 xc:blue +append -orient RightTop -compress zip rotated.tif
 convert -size 8x8 xc:red -colorspace CMYK -compress zip cmyk.tif
 ```
+
+Ours (round 10), with libheif 1.17.6 (heif-enc, x265) and ImageMagick 6.9.12:
+
+```sh
+convert -size 8000x8000 gradient:red-blue p64.png && heif-enc -q 10 p64.png -o coded-64mp.heic
+convert -size 9000x9000 gradient:red-blue big.png && heif-enc -q 10 big.png -o big.heic
+```
+
+`lying-ispe.heic` is `big.heic` with the width and height of its `ispe` property
+(the 8 bytes after `ispe` and its 4 bytes of version and flags) set to 64 and 64:
+it declares 64x64 and codes 9000x9000, which libheif decodes whole.
+`coded-64mp.heic` codes and declares 8000x8000, the default limit of 64 megapixels.
