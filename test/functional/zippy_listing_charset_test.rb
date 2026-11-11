@@ -156,4 +156,27 @@ class ZippyListingCharsetTest < Redmine::ControllerTest
       assert_equal 'sandbox allow-downloads allow-popups allow-popups-to-escape-sandbox', response.headers['Content-Security-Policy']
     end
   end
+
+  # ours (after curecodejp 3b8a5ea): Cliff writes every body in UTF-8, an html
+  # body without <meta> as well: without the charset in the header a browser
+  # read "café" as "cafÃ©" (seen in the round 10 e2e, a Windows-1252 email);
+  # Cliff gets no top navigation, its html is the email's
+  def test_cliff_html_is_sent_as_utf8_without_top_navigation
+    Setting.plugin_redmine_more_previews = SETTINGS.deep_merge(
+      'converter' => {'cliff' => {'active' => '1', 'mime_types' => {'eml' => {'active' => '1', 'format' => 'html'}}}}
+    )
+    Setting.clear_cache
+    Dir.mktmpdir do |dir|
+      path = File.join(dir, 'w1252.eml')
+      File.binwrite(path, "From: a@example.test\r\nTo: b@example.test\r\nSubject: s\r\nMIME-Version: 1.0\r\n" \
+                          "Content-Type: text/html; charset=Windows-1252\r\nContent-Transfer-Encoding: quoted-printable\r\n\r\n" \
+                          "<p>caf=E9 na=EFve =80</p>\r\n")
+      a = attach(path, 'message/rfc822')
+      get :more_preview, params: {id: a.id, format: 'html'}
+      assert_response :success
+      assert_equal 'text/html; charset=utf-8', response.headers['Content-Type']
+      assert_displayed_as 'café naïve €', response
+      assert_equal 'sandbox allow-downloads allow-popups allow-popups-to-escape-sandbox', response.headers['Content-Security-Policy']
+    end
+  end
 end

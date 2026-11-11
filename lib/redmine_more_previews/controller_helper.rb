@@ -112,8 +112,13 @@ module RedmineMorePreviews
     private :reject_oversized_cliff_fragment!
     
     # converters whose html the plugin writes itself, always in UTF-8: Zippy's
-    # listing is a fragment without <meta charset>
-    UTF8_PREVIEW_CONVERTERS = %w(zippy).freeze
+    # listing is a fragment without <meta charset>; Cliff converts every body to
+    # UTF-8 since 3b8a5ea, an html body without <meta> included (ours)
+    UTF8_PREVIEW_CONVERTERS = %w(zippy cliff).freeze
+    
+    # converters whose html links may open in the top window: the plugin's own
+    # listing only, never an email's html
+    TOP_NAVIGATION_PREVIEW_CONVERTERS = %w(zippy).freeze
     
     # the Content-Type of a preview: the html of those converters says UTF-8 in
     # the header, else a browser guessed another encoding and garbled non-ASCII
@@ -128,11 +133,12 @@ module RedmineMorePreviews
     end #def
     private :preview_content_type
     
-    # the preview asked for is html one of those converters writes
-    def plugin_html_preview?(source, options={})
+    # the preview asked for is html one of the converters writes (by default
+    # those of UTF8_PREVIEW_CONVERTERS)
+    def plugin_html_preview?(source, options={}, converters=UTF8_PREVIEW_CONVERTERS)
       return false unless params[:format].to_s.casecmp?('html')
       converter = RedmineMorePreviews::Converter.responsible(source.to_s, options)
-      UTF8_PREVIEW_CONVERTERS.include?(converter&.id.to_s)
+      converters.include?(converter&.id.to_s)
     end #def
     private :plugin_html_preview?
     
