@@ -9,6 +9,12 @@ RedmineMorePreviews::Constants::Defaults.send(:remove_const, :MORE_PREVIEWS_STOR
 RedmineMorePreviews::Constants::Defaults.const_set(:MORE_PREVIEWS_STORAGE_PATH, Dir.mktmpdir('rmp-test-storage'))
 Minitest.after_run { FileUtils.rm_rf(RedmineMorePreviews::Constants::Defaults::MORE_PREVIEWS_STORAGE_PATH) }
 
+# sanitized inline previews are kept in the process (curecodejp 0b3e950, #71):
+# no test may read what another one sanitized
+ActiveSupport::TestCase.setup do
+  RedmineMorePreviews::Patches::ApplicationHelperPatch::INLINE_PREVIEW_CACHE.clear
+end
+
 module RedmineMorePreviews
   module TestHelper
     FILES = File.expand_path('fixtures/files', __dir__)

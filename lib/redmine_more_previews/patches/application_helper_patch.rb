@@ -32,6 +32,16 @@ module RedmineMorePreviews
       # 5fb219a, #61)
       MAX_INLINE_PREVIEW_HTML_BYTES = 256 * 1024
       
+      # sanitizing html near that limit can take seconds, on every page view:
+      # the results are kept in the process (port of curecodejp 0b3e950, #71).
+      # Not Rails.cache (a file store without size limit by default) nor the
+      # preview storage (written by converters); a restart empties it, so a
+      # changed sanitizer never serves results of the old one. MemoryStore
+      # synchronizes every access with its own monitor: safe for Puma threads
+      INLINE_PREVIEW_CACHE = ActiveSupport::Cache::MemoryStore.new(
+        :size => 32 * 1024 * 1024, :expires_in => 1.hour
+      )
+      
       def self.included(base)
         base.class_eval do
         
@@ -45,10 +55,19 @@ module RedmineMorePreviews
               return content_tag(:p, l(:text_more_previews_inline_too_large), :class => "nodata")
             end
             begin
-              sanitize(html,
-                :tags       => ActionView::Base.sanitized_allowed_tags.to_a + RedmineMorePreviews::Patches::ApplicationHelperPatch::INLINE_TAGS,
-                :attributes => ActionView::Base.sanitized_allowed_attributes.to_a + %w(colspan rowspan align download style)
-              )
+              # keyed on the content, so query parameters cannot bypass it; while
+              # the preview cache is off nothing new is kept and nothing kept is
+              # read (it expires on its own). A parser failure raises in the block
+              # and is not kept
+              if RedmineMorePreviews::Converter.cache_previews?
+                key = "#{Redmine::Utils.relative_url_root}:#{Digest::SHA256.hexdigest(html)}"
+                # a plain String is kept, not the SafeBuffer, marked safe again here
+                RedmineMorePreviews::Patches::ApplicationHelperPatch::INLINE_PREVIEW_CACHE.fetch(key) do
+                  sanitize_inline_preview_html(html).to_str
+                end.html_safe
+              else
+                sanitize_inline_preview_html(html)
+              end
             rescue ArgumentError => e
               # the HTML5 parser raises on markup over its tree depth or attribute
               # limits: keep the page, never fall back to the input (port of
@@ -56,6 +75,13 @@ module RedmineMorePreviews
               Rails.logger.warn("Inline preview not sanitized: #{e.message}")
               content_tag(:p, l(:text_more_previews_inline_too_complex), :class => "nodata")
             end
+          end #def
+          
+          def sanitize_inline_preview_html(html)
+            sanitize(html,
+              :tags       => ActionView::Base.sanitized_allowed_tags.to_a + RedmineMorePreviews::Patches::ApplicationHelperPatch::INLINE_TAGS,
+              :attributes => ActionView::Base.sanitized_allowed_attributes.to_a + %w(colspan rowspan align download style)
+            )
           end #def
           
           # query parameters the preview views may forward to the converters.
