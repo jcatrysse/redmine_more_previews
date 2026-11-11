@@ -143,7 +143,9 @@ class LibreSandboxIntegrationTest < ActiveSupport::TestCase
 
   # the images of an HTML preview are found by their links, for a repository
   # file whose name has no ASCII letter or digit (it keeps its name in the
-  # sandbox) and for an attachment (its name is made ASCII before, #25077)
+  # sandbox) and for an attachment (its name is made ASCII before, #25077).
+  # Since round 10 (curecodejp 194c0b4, #84) the image a link names is embedded
+  # as a data: URI: only an image found by its link is
   def test_html_image_links_resolve_for_non_ascii_names
     { '会議録.docx' => :repository, 'Offerte_Réunion 2026.docx' => :attachment }.each do |name, type|
       Dir.mktmpdir('rmp-libre-image-link') do |dir|
@@ -156,8 +158,8 @@ class LibreSandboxIntegrationTest < ActiveSupport::TestCase
           assert_includes data.to_s, 'LIBRE-IMAGE-LINK-TEST', name
           links = data.scan(/<img[^>]* src="([^"]+)"/i).flatten
           assert_equal 1, links.size, "#{name}: #{links.inspect}"
-          assert_match(/_html_\h+\.png\z/, links.first, name)
-          assert File.file?(File.join(cache, URI.decode_uri_component(links.first))), "#{name}: #{links.first} names a stored image"
+          assert links.first.start_with?('data:image/png;base64,'), "#{name}: #{links.first[0, 60]}"
+          assert_equal "\x89PNG".b, Base64.decode64(links.first.split(',', 2).last)[0, 4], name
         end
       ensure
         FileUtils.rm_rf(File.join(RedmineMorePreviews::Constants::Defaults::MORE_PREVIEWS_STORAGE_PATH, 'libre-image-link'))

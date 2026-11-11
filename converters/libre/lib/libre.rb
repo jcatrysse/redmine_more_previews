@@ -58,6 +58,7 @@ class Libre < RedmineMorePreviews::Conversion
       # LibreOffice names its output after the input inside the sandbox
       generated = File.join(tmpdir, File.basename(sandbox_input_name(source), '.*') + ".#{preview_format}")
       raise ConverterShellError, 'LibreOffice output is missing' unless File.file?(generated)
+      embed_images(generated) if preview_format.to_s == 'html'
       File.rename(generated, tmptarget) unless generated == tmptarget
     end
     
@@ -228,6 +229,19 @@ class Libre < RedmineMorePreviews::Conversion
     execution = args.index('--setenv')
     args.insert(execution, *extra_mounts)
     args.map { |arg| shell_quote(arg) }.join(' ')
+  end #def
+  
+  # the frame of an HTML preview cannot request the images LibreOffice writes
+  # beside the page: they are embedded, as long as the page stays within the
+  # size of a preview (see RmpDataUri; port of curecodejp 194c0b4, #84)
+  def embed_images(page)
+    # a page larger than a preview is refused later without being read
+    budget = RedmineMorePreviews::Converter.max_output - File.size(page)
+    return unless budget > 0
+    
+    html = File.binread(page)
+    embedded = RedmineMorePreviews::Lib::RmpDataUri.embed(html, tmpdir, budget)
+    File.binwrite(page, embedded) unless embedded == html
   end #def
   
 end #class
