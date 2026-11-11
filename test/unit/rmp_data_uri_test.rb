@@ -173,4 +173,40 @@ class RmpDataUriTest < ActiveSupport::TestCase
     worker.convert
     assert_includes File.read(worker.tmptarget), %(<img src="#{png_uri}">)
   end
+
+  # ours (round 10): no file outside the conversion's output, whatever names it
+  def test_no_image_through_a_symlinked_directory_or_a_hard_link
+    outside = Dir.mktmpdir('rmp-data-uri-outside')
+    File.binwrite(File.join(outside, 'b.png'), PNG)
+    File.symlink(outside, File.join(@dir, 'dir'))
+    assert_nil DataUri.image(@dir, File.join(@dir, 'dir', 'b.png'), BUDGET)
+    assert_equal '<img src="dir/b.png">', DataUri.embed('<img src="dir/b.png">', @dir, BUDGET)
+    File.link(File.join(outside, 'b.png'), File.join(@dir, 'hard.png'))
+    assert_nil DataUri.image(@dir, File.join(@dir, 'hard.png'), BUDGET)
+    assert_equal '<img src="hard.png">', DataUri.embed('<img src="hard.png">', @dir, BUDGET)
+  ensure
+    FileUtils.rm_rf(outside)
+  end
+
+  def test_embed_keeps_encoded_traversal_absolute_and_remote_sources
+    outside = Dir.mktmpdir('rmp-data-uri-outside')
+    File.binwrite(File.join(outside, 'b.png'), PNG)
+    name = File.basename(outside)
+    write('a.png')
+    ["%2e%2e/#{name}/b.png", "..%2F#{name}/b.png", "%2F#{outside[1..]}/b.png", "//example.test/b.png",
+     "file://#{outside}/b.png", "http://example.test/a.png", "C:/a.png", "a.png#x"].each do |src|
+      html = %(<img src="#{src}">)
+      assert_equal html, DataUri.embed(html, @dir, BUDGET), src
+    end
+  ensure
+    FileUtils.rm_rf(outside)
+  end
+
+  # a FIFO would block the worker that read it; a directory is no image
+  def test_no_image_of_a_fifo_or_a_directory
+    File.mkfifo(File.join(@dir, 'fifo.png'))
+    FileUtils.mkdir_p(File.join(@dir, 'dir.png'))
+    assert_nil DataUri.image(@dir, File.join(@dir, 'fifo.png'), BUDGET)
+    assert_nil DataUri.image(@dir, File.join(@dir, 'dir.png'), BUDGET)
+  end
 end

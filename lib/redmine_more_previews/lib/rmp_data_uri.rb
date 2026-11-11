@@ -44,8 +44,12 @@ module RedmineMorePreviews
         # a data: URI of the image at path, or nil when path is not a regular
         # file inside directory, not a raster image, or its URI would be longer
         # than budget bytes
+        # (ours: nor a file with another name somewhere, a hard link may be a
+        # second name of a file outside the directory)
         def image( directory, path, budget )
-          return nil unless path.present? && File.file?( path ) && !File.symlink?( path )
+          return nil unless path.present?
+          stat = File.lstat( path )
+          return nil unless stat.file? && stat.nlink == 1
           return nil unless RmpFile.within_directory?( directory, path )
           return nil if uri_size( File.size( path ) ) > budget
           mime = Marcel::MimeType.for( Pathname.new( path ) )
