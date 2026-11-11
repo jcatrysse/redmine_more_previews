@@ -64,6 +64,19 @@ module RedmineMorePreviews
     end #def
     private :preview_etag
 
+    # the preview is stored as index.<format>, but a browser's PDF viewer saves
+    # under the name of the Content-Disposition: a converted PDF is named after
+    # the original (its basename, further dots kept), other formats keep the
+    # stored name (port of curecodejp 31d1001, #73)
+    def preview_download_filename(original_filename, stored_filename)
+      return stored_filename unless File.extname(stored_filename.to_s).casecmp?('.pdf')
+
+      source = File.basename(original_filename.to_s.tr('\\', '/'))
+      stem = source.delete_suffix(File.extname(source))
+      stem.present? ? "#{stem}.pdf" : stored_filename
+    end
+    private :preview_download_filename
+
     # seconds after which a client may ask again for a preview that was busy
     BUSY_RETRY_AFTER = 10
 

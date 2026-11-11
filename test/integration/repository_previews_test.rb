@@ -94,6 +94,28 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  # port of curecodejp 31d1001 (#73): a converted PDF of a repository file is
+  # named after the file (upstream's test on a Filesystem repository; the
+  # conversion stubbed, no LibreOffice)
+  def test_converted_pdf_uses_the_name_of_the_repository_file
+    name = 'monthly.report.2026.xlsx'
+    File.binwrite(File.join(@dir, name), 'synthetic spreadsheet')
+    system('git', '-C', @dir, 'add', name, exception: true, out: File::NULL, err: File::NULL)
+    system('git', '-C', @dir, '-c', 'user.name=Test', '-c', 'user.email=test@example.net', 'commit', '-q', '-m', 'xlsx',
+           exception: true, out: File::NULL, err: File::NULL)
+    @repository.fetch_changesets
+    with_converters(CONVERTERS) do
+      Redmine::Scm::Adapters::Entry.any_instance.stubs(:convertible?).returns(true)
+      Repository::Git.any_instance.stubs(:more_preview).returns('%PDF-1.4 synthetic')
+      log_user('jsmith', 'jsmith')
+      get "/projects/ecookbook/repository/samples/preview/#{name}@/index.pdf"
+      assert_response :success
+      assert_equal 'application/pdf', response.media_type
+      assert_includes response.headers['Content-Disposition'], 'monthly.report.2026.pdf'
+      assert_not_includes response.headers['Content-Disposition'], 'index.pdf'
+    end
+  end
+
   def test_more_preview_returns_the_conversion
     with_converters(CONVERTERS) do
       log_user('jsmith', 'jsmith')
