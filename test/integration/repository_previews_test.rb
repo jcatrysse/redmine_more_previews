@@ -144,6 +144,18 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  # port of curecodejp e1a2d25 (#76), on our git repository
+  def test_image_preview_has_a_message_for_when_it_fails_to_load
+    with_converters(CONVERTERS) do
+      RedmineMorePreviews::Converter.stubs(:conversion_ext).returns('png')
+      log_user('jsmith', 'jsmith')
+      get '/projects/ecookbook/repository/samples/entry/docs/sample.txt'
+      assert_response :success
+      assert_select 'img[onerror]', 1
+      assert_select 'img[onerror] + p.nodata[style*="display:none"]', :text => I18n.t(:text_more_previews_image_failed), :count => 1
+    end
+  end
+
   def test_more_preview_returns_the_conversion
     with_converters(CONVERTERS) do
       log_user('jsmith', 'jsmith')

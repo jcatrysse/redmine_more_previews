@@ -112,6 +112,17 @@ module RedmineMorePreviews
             )
           end
           
+          # the preview is a request of its own, so only the browser learns that it
+          # failed (an image beyond the conversion's limits, say) and showed a
+          # broken image without a reason. The handler is an attribute, so that it
+          # cannot miss an error before a script would have run (port of curecodejp
+          # e1a2d25, #76)
+          def more_previews_image_tag(source, options={})
+            image_tag(source, options.merge(
+              :onerror => "this.style.display='none';this.nextElementSibling.style.display='';"
+            )) + content_tag(:p, l(:text_more_previews_image_failed), :class => "nodata", :style => "display:none")
+          end #def
+          
           def more_previews_tag(path, filename, options={})
           
             html_preview = options[:type].to_s.split(';').first == 'text/html'
