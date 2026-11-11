@@ -78,6 +78,7 @@ class MaggieHeifHardeningTest < ActiveSupport::TestCase
   # an oversized ispe: 413 before ImageMagick, with the size in the reason
   def test_an_oversized_ispe_is_refused_before_imagemagick
     RedmineMorePreviews.stubs(:imagemagick_reads?).returns(true)
+    RedmineMorePreviews.stubs(:imagemagick_decodes?).returns(true)
     worker = worker_for('big.heic', heic_header({1 => [100_000, 100_000]}))
     worker.expects(:command).never
     error = assert_raises(RedmineMorePreviews::Exceptions::ConverterTooLarge) { worker.convert }
@@ -88,6 +89,7 @@ class MaggieHeifHardeningTest < ActiveSupport::TestCase
 
   def test_heic_and_tiff_commands_run_with_an_address_space_limit
     RedmineMorePreviews.stubs(:imagemagick_reads?).returns(true)
+    RedmineMorePreviews.stubs(:imagemagick_decodes?).returns(true)
     {'a.heic' => heic_header({1 => [64, 64]}), 'a.tif' => tiff_header(64, 64)}.each do |name, bytes|
       assert_match(/\Acd '[^']+'; ulimit -v 2621440 \|\| exit 1; '?convert/, command_of(worker_for(name, bytes)), name)
       @settings = @settings.merge('max_megapixels' => '16')
@@ -133,8 +135,7 @@ class MaggieHeifHardeningTest < ActiveSupport::TestCase
   private
 
   def real_heic!
-    RedmineMorePreviews.unstub(:imagemagick_reads?) if RedmineMorePreviews.respond_to?(:unstub)
-    skip 'ImageMagick reads no HEIC' unless RedmineMorePreviews.imagemagick_reads?('HEIC')
+    skip 'ImageMagick lists no HEIC, or decodes no file of it (no HEVC decoder, f.i. libheif-plugin-libde265)' unless Maggie.coder_available?('HEIC')
   end
 
   def worker_for(name, bytes)

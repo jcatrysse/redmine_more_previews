@@ -13,6 +13,6 @@
 <%# whether the ImageMagick program Redmine runs has the coder of each format;
     the icon as the status lines of the settings draw it (Redmine 7: SVG sprites) %>
 <% Maggie::IMAGE_FORMATS.each_value do |format| %>
-<% readable = RedmineMorePreviews.imagemagick_reads?(format[:coder]) %>
+<% readable = Maggie.coder_available?(format[:coder]) %>
 <p><%= format[:label] %> (<%= File.basename(RedmineMorePreviews.convert_bin.to_s) %>) <span class="icon-only <%= readable ? 'icon-ok' : 'icon-error' %>"><%= sprite_icon(readable ? 'checked' : 'warning') %></span></p>
 <% end %>

@@ -40,6 +40,8 @@ class MaggieCommandTest < ActiveSupport::TestCase
     @dir = Dir.mktmpdir('rmp-maggie')
     Redmine::Thumbnail.stubs(:gs_available?).returns(true)
     RedmineMorePreviews.stubs(:imagemagick_reads?).returns(true)
+    # ours: a listed HEIC coder must also decode (see imagemagick_decodes?)
+    RedmineMorePreviews.stubs(:imagemagick_decodes?).returns(true)
     @settings = ALL_ENABLED
   end
 
@@ -395,11 +397,15 @@ class MaggieCommandTest < ActiveSupport::TestCase
   def real_conversion(fixture, format = 'png', bytes = nil)
     coder = fixture.end_with?('.tif') ? 'TIFF' : 'HEIC'
     RedmineMorePreviews.unstub(:imagemagick_reads?)
+    RedmineMorePreviews.unstub(:imagemagick_decodes?)
     RedmineMorePreviews.stubs(:convert_bin).returns(test_convert_bin)
-    unless RedmineMorePreviews.imagemagick_reads?(coder)
+    # ours: listed is not enough, the coder must decode a file (HEIC without an
+    # HEVC decoder such as libheif-plugin-libde265 is listed and decodes nothing)
+    unless Maggie.coder_available?(coder)
+      reason = RedmineMorePreviews.imagemagick_reads?(coder) ? "lists #{coder} but decodes no file of it (for HEIC: no HEVC decoder, f.i. libheif-plugin-libde265)" : "reads no #{coder}"
       # CI sets it: a skipped conversion must not pass for a verified one
-      flunk "#{test_convert_bin} reads no #{coder}" if ENV['RMP_REQUIRE_IMAGE_CODERS'] == '1'
-      skip "#{test_convert_bin} reads no #{coder}"
+      flunk "#{test_convert_bin} #{reason}" if ENV['RMP_REQUIRE_IMAGE_CODERS'] == '1'
+      skip "#{test_convert_bin} #{reason}"
     end
     @worker = worker_for(fixture, bytes || File.binread(File.join(FIXTURES, fixture)))
     @worker.preview_format = format

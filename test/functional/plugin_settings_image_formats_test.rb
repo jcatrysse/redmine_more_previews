@@ -72,6 +72,7 @@ class PluginSettingsImageFormatsTest < Redmine::ControllerTest
   def test_enabling_with_the_coder_is_saved
     RedmineMorePreviews.stubs(:imagemagick_reads?).with('HEIC').returns(true)
     RedmineMorePreviews.stubs(:imagemagick_reads?).with('TIFF').returns(true)
+    RedmineMorePreviews.stubs(:imagemagick_decodes?).returns(true)
     updated = enable('heic', 'tif')
     post :plugin, params: {id: 'redmine_more_previews', settings: updated}
     assert flash[:error].blank?
@@ -157,5 +158,26 @@ class PluginSettingsImageFormatsTest < Redmine::ControllerTest
     updated = @settings.deep_dup
     extensions.each {|ext| updated['converter']['maggie']['mime_types'][ext]['active'] = '1'}
     updated
+  end
+
+  # ours: HEIC listed by ImageMagick but not decoded (libheif without an HEVC
+  # decoder plugin): enabling it is refused, and the settings say so
+  def test_enabling_heic_that_is_listed_but_not_decoded_is_not_saved
+    RedmineMorePreviews.stubs(:imagemagick_reads?).returns(true)
+    RedmineMorePreviews.stubs(:imagemagick_decodes?).with('HEIC').returns(false)
+    RedmineMorePreviews.stubs(:imagemagick_decodes?).with('TIFF').returns(true)
+    before = Setting.plugin_redmine_more_previews
+    post :plugin, params: {id: 'redmine_more_previews', settings: enable('heic')}
+    assert_redirected_to '/settings/plugin/redmine_more_previews'
+    assert_includes flash[:error], 'HEIC/HEIF'
+    assert_equal before, Setting.plugin_redmine_more_previews
+
+    post :plugin, params: {id: 'redmine_more_previews', settings: enable('tif')}
+    assert flash[:error].blank?
+
+    get :plugin, params: {id: 'redmine_more_previews'}
+    assert_select '#converter_settings_maggie p', text: /HEIC\/HEIF/ do
+      assert_select 'span.icon-error'
+    end
   end
 end

@@ -85,10 +85,16 @@ class Maggie < RedmineMorePreviews::Conversion
   ADDRESS_SPACE_BASE_KIB          = 1024 * 1024
   ADDRESS_SPACE_PER_MEGAPIXEL_KIB = 24 * 1024
   
+  # whether ImageMagick lists a coder that reads the format and, for HEIC, really
+  # decodes a file of it (ours: RedmineMorePreviews.imagemagick_decodes?)
+  def self.coder_available?( coder )
+    RedmineMorePreviews.imagemagick_reads?(coder) && RedmineMorePreviews.imagemagick_decodes?(coder)
+  end #def
+  
   # the formats (labels) whose coder ImageMagick lacks among the given extensions
   def self.unreadable_formats( extensions )
     IMAGE_FORMATS.values.
-      select{|f| (f[:extensions] & extensions.map(&:to_s)).any? && !RedmineMorePreviews.imagemagick_reads?(f[:coder]) }.
+      select{|f| (f[:extensions] & extensions.map(&:to_s)).any? && !coder_available?(f[:coder]) }.
       map{|f| f[:label] }
   end #def
     
@@ -136,7 +142,7 @@ class Maggie < RedmineMorePreviews::Conversion
     enabled = converter_settings.to_h.dig("mime_types").to_h
     format[:extensions].any?{|ext| [true, 1, "1"].include?(enabled.dig(ext, "active")) } &&
       RedmineMorePreviews.send(format[:magic], source) &&
-      RedmineMorePreviews.imagemagick_reads?(format[:coder])
+      Maggie.coder_available?(format[:coder])
   end #def
   
   # whether the size the image declares can be read and is within max_megapixels

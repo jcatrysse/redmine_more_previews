@@ -271,13 +271,57 @@ module RedmineMorePreviews
     end
   end #def
   
+  # Ours: a coder ImageMagick lists may still decode nothing: HEIC is listed
+  # whenever ImageMagick was built with libheif, and decoded only when libheif
+  # has an HEVC decoder plugin (libheif-plugin-libde265); without it every
+  # conversion failed with "Unsupported codec". A coder of IMAGEMAGICK_PROBES
+  # counts as decoding once a tiny file of it (shipped with the plugin) has
+  # really been decoded; others are taken as listed. Asked once per program and
+  # coder: a success is kept, a failure for IMAGEMAGICK_PROBE_RETRY seconds (a
+  # decoder installed meanwhile is found without a restart)
+  IMAGEMAGICK_PROBES = {"HEIC" => File.expand_path("redmine_more_previews/probes/probe.heic", __dir__)}.freeze
+  IMAGEMAGICK_PROBE_RETRY = 300
+  IMAGEMAGICK_PROBE_LOCK  = Mutex.new
+
+  def self.imagemagick_decodes?(coder)
+    probe = IMAGEMAGICK_PROBES[coder]
+    return true unless probe
+    key = [convert_bin, coder]
+    IMAGEMAGICK_PROBE_LOCK.synchronize do
+      @imagemagick_decodes ||= {}
+      known, at = @imagemagick_decodes[key]
+      return known if known || (at && Process.clock_gettime(Process::CLOCK_MONOTONIC) - at < IMAGEMAGICK_PROBE_RETRY)
+      result = imagemagick_decode_probe(coder, probe)
+      @imagemagick_decodes[key] = [result, Process.clock_gettime(Process::CLOCK_MONOTONIC)]
+      result
+    end
+  end #def
+
+  # whether ImageMagick decodes the probe file with the coder: it prints the
+  # image's size, within the limits of the previews (see imagemagick_run)
+  def self.imagemagick_decode_probe(coder, probe)
+    out = imagemagick_run(*IMAGEMAGICK_LIMITS.flat_map{|resource, value| ["-limit", resource, value] },
+                          "#{coder.downcase}:#{probe}[0]", "-format", "%wx%h", "info:")
+    out.to_s.match?(/\A\d+x\d+\z/)
+  end #def
+
+  def self.reset_imagemagick_decodes
+    IMAGEMAGICK_PROBE_LOCK.synchronize { @imagemagick_decodes = nil }
+  end #def
+
   # "-list format" of the program, nil when it fails or runs longer than
   # imagemagick_list_timeout seconds: it is asked within a request
   def self.imagemagick_list_formats
+    imagemagick_run("-list", "format")
+  end #def
+
+  # the output of the program with args (no shell), nil when it fails or runs
+  # longer than imagemagick_list_timeout seconds
+  def self.imagemagick_run(*args)
     # Windows has no process groups to signal (see Lib::RmpProcess)
     windows = Redmine::Platform.mswin?
     group = windows ? {:new_pgroup => true} : {:pgroup => true}
-    Open3.popen2e(convert_bin, "-list", "format", **group) do |stdin, out, wait|
+    Open3.popen2e(convert_bin, *args, **group) do |stdin, out, wait|
       stdin.close
       reader = Thread.new { out.read }
       unless wait.join(imagemagick_list_timeout)
