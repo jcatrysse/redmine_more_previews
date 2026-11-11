@@ -24,3 +24,5 @@ zh:
   redmine_more_previews:
     maggie:
       text_explanation:          "转换和/或减少图像文件"
+      label_max_megapixels:      "最大的 HEIC 或 TIFF 图像（百万像素）"
+      text_help_limits:          "只有当 HEIC 或 TIFF 图像的文件头给出其尺寸且尺寸在限制以内时才会转换：更大的图像返回 413（太大）。解码这些图像的库会为整个图像使用自己的内存，不受 ImageMagick 限制的约束。"
