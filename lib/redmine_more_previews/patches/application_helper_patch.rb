@@ -129,16 +129,17 @@ module RedmineMorePreviews
                 content_tag(
                   :iframe,
                   "",
-                  { :style                => "position:absolute;top:0;left:0;width:95%;height:16px;",
+                  # the frame fills its pane: it was 16px high until its load event
+                  # set the window's height, which a PDF frame never fired, so a PDF
+                  # stayed a strip (port of curecodejp 5efeb83, #72)
+                  { :style                => "position:absolute;top:0;left:0;width:95%;height:100%;",
                     :seamless             => "seamless",
                     :scrolling            => "no",
                     :frameborder          => "0",
                     :allowtransparency    => "true",
                     :title                => filename,
                     :src                  => path,
-                    :id                   => 'preview_frame',
-                    :onload               => "$(document).ready(function() {$('#preview_frame').css('height', $(window).height())});".html_safe 
-                                             
+                    :id                   => 'preview_frame'
                    }.merge(options)
                 ),
                 :id    => "preview_pane",
