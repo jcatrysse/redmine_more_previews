@@ -99,17 +99,21 @@ module RedmineMorePreviews
           def send_more_preview
             sandbox_preview Rack::Mime.mime_type(".#{params[:format]}")
             download_name = preview_download_filename(@entry&.name || @path, @repository.preview_filename(@path, @rev, preview_params))
+            # by the entry's name: its content is read by the conversion only
+            preview_type  = preview_content_type(@entry&.name || @path, :pathonly => true)
             if !preview_unsafe? && RedmineMorePreviews::Converter.cache_previews?
               # the name of a PDF is part of the response (see AttachmentsControllerPatch)
               etag = preview_etag(@repository.preview_mtime(@path, @rev, preview_params))
               etag << download_name if params[:format].to_s.downcase == 'pdf'
+              # a browser that kept a listing served without the charset gets it again
+              etag << preview_type if preview_type.include?("charset")
               if preview_reload? || stale?(:etag => etag)
                 # nil: the conversion failed or timed out (see Conversion#preview)
                 data = @repository.more_preview(@path, @rev, preview_params)
                 return render_404 if data.nil?
                 send_data data,
                   :filename    => filename_for_content_disposition( download_name ),
-                  :type        => Rack::Mime.mime_type(".#{params[:format]}"),
+                  :type        => preview_type,
                   :disposition => 'inline'
               end
             else #no cache
@@ -118,7 +122,7 @@ module RedmineMorePreviews
                  next if preview_data.nil?
                  send_data preview_data,
                    :filename    => filename_for_content_disposition( download_name ),
-                   :type        => Rack::Mime.mime_type(".#{params[:format]}"),
+                   :type        => preview_type,
                    :disposition => 'inline'
               end
               # the conversion failed or timed out: nothing was yielded

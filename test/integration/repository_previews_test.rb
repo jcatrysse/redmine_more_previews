@@ -156,6 +156,28 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  # port of curecodejp ee6c728 (#79), on our git repository
+  def test_zip_listing_is_shown_in_utf8
+    User.find_by_login('jsmith').update_column(:language, 'ja')
+    with_converters(CONVERTERS) do
+      log_user('jsmith', 'jsmith')
+      get '/projects/ecookbook/repository/samples/preview/sample.zip@/index.html'
+      assert_response :success
+      assert_equal 'text/html; charset=utf-8', response.headers['Content-Type']
+      assert_displayed_as 'ファイル名', response
+      # the first request converts: the ETag follows the cache
+      get '/projects/ecookbook/repository/samples/preview/sample.zip@/index.html'
+      etag = response.headers['ETag']
+      get '/projects/ecookbook/repository/samples/preview/sample.zip@/index.html', headers: { 'If-None-Match' => etag }
+      assert_response :not_modified
+    end
+    with_converters(CONVERTERS, 'cache_previews' => '0') do
+      get '/projects/ecookbook/repository/samples/preview/sample.zip@/index.html'
+      assert_response :success
+      assert_displayed_as 'ファイル名', response
+    end
+  end
+
   def test_more_preview_returns_the_conversion
     with_converters(CONVERTERS) do
       log_user('jsmith', 'jsmith')

@@ -107,18 +107,21 @@ module RedmineMorePreviews
           def send_more_preview
             sandbox_preview Rack::Mime.mime_type(".#{params[:format]}")
             download_name = preview_download_filename(@attachment.filename, @attachment.preview_filename(preview_params))
+            preview_type  = preview_content_type(@attachment.diskfile)
             if !preview_unsafe? && RedmineMorePreviews::Converter.cache_previews?
               # the name of a PDF is part of the response: in the ETag, so that a
               # browser does not keep index.pdf or the name before a rename
               etag = preview_etag(@attachment.preview_mtime(preview_params))
               etag << download_name if params[:format].to_s.downcase == 'pdf'
+              # a browser that kept a listing served without the charset gets it again
+              etag << preview_type if preview_type.include?("charset")
               if preview_reload? || stale?(:etag => etag)
                 # nil: the conversion failed or timed out (see Conversion#preview)
                 data = @attachment.more_preview(preview_params)
                 return render_404 if data.nil?
                 send_data data,
                   :filename    => filename_for_content_disposition( download_name ),
-                  :type        => Rack::Mime.mime_type(".#{params[:format]}"),
+                  :type        => preview_type,
                   :disposition => 'inline'
               end
             else #no cache
@@ -127,7 +130,7 @@ module RedmineMorePreviews
                  next if preview_data.nil?
                  send_data preview_data,
                    :filename    => filename_for_content_disposition( download_name ),
-                   :type        => Rack::Mime.mime_type(".#{params[:format]}"),
+                   :type        => preview_type,
                    :disposition => 'inline'
               end
               # the conversion failed or timed out: nothing was yielded

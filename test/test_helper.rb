@@ -115,6 +115,25 @@ module RedmineMorePreviews
       path
     end
 
+    # the encoding a browser reads an html response in: the charset of the
+    # Content-Type, else a <meta charset> (or http-equiv) in the first 1024
+    # bytes; nil: the browser guesses (curecodejp ee6c728, #79)
+    def declared_charset(response)
+      header = response.headers['Content-Type'].to_s[/;\s*charset=["']?([^;"'\s]+)/i, 1]
+      return header.downcase if header
+      head = response.body.to_s.b[0, 1024]
+      head[/<meta[^>]+charset\s*=\s*["']?([A-Za-z0-9_\-]+)/i, 1]&.downcase
+    end
+
+    # +text+ shows as it is: the body read in the declared encoding holds it
+    def assert_displayed_as(text, response)
+      charset = declared_charset(response)
+      assert charset, "no charset declared, the browser has to guess (Content-Type: #{response.headers['Content-Type'].inspect})"
+      shown = response.body.to_s.dup.force_encoding(charset)
+      assert shown.valid_encoding?, "body is not valid #{charset}"
+      assert_includes shown.encode('UTF-8'), text
+    end
+
     def zippy_worker(options = {})
       RedmineMorePreviews::Converter.find(:zippy).worker(
         { preview_format: 'html', object: {} }.merge(options)

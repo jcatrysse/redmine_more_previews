@@ -111,6 +111,25 @@ module RedmineMorePreviews
     end #def
     private :reject_oversized_cliff_fragment!
     
+    # converters whose html the plugin writes itself, always in UTF-8: Zippy's
+    # listing is a fragment without <meta charset>
+    UTF8_PREVIEW_CONVERTERS = %w(zippy).freeze
+    
+    # the Content-Type of a preview: the html of those converters says UTF-8 in
+    # the header, else a browser guessed another encoding and garbled non-ASCII
+    # names; being a header, it holds for listings stored before as well. Other
+    # html (Pass serves the uploaded file as it is) keeps the bare type. +source+
+    # selects the converter as the conversion does: by content for a file, by
+    # name only for a name (port of curecodejp ee6c728, #79)
+    def preview_content_type(source, options={})
+      type = Rack::Mime.mime_type(".#{params[:format]}")
+      return type unless params[:format].to_s.casecmp?('html')
+      converter = RedmineMorePreviews::Converter.responsible(source.to_s, options)
+      return type unless UTF8_PREVIEW_CONVERTERS.include?(converter&.id.to_s)
+      "#{type}; charset=utf-8"
+    end #def
+    private :preview_content_type
+    
     # Previews and assets are converted user files served from Redmine's origin.
     # Sandbox them, so that a script in a converted html, svg or mail cannot act
     # in the user's Redmine session. Chrome does not render a PDF in a sandbox.
