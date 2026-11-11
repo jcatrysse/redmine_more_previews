@@ -37,7 +37,10 @@ module RedmineMorePreviews
     # linked none of them in the first conversion and an attachment without an
     # extension stored the email as not previewed, which the attachment and
     # repository pages now read from the cache; Vince ended its logo with '%>'
-    CACHE_FORMAT_VERSION = 'converter-fixes-v2'.freeze
+    # Round 10 (upstream 3b8a5ea, 194c0b4): Cliff showed bodies not in UTF-8 in
+    # their own charset; Cliff and Libre html previews linked their images,
+    # which the sandboxed frame cannot load in a project that is not public
+    CACHE_FORMAT_VERSION = 'converter-fixes-v3'.freeze
     SAFE_DEBUG_FIELDS = %w(converter converter_version plugin_version source_type preview_format).freeze
   
     

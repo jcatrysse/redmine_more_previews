@@ -257,7 +257,7 @@ class CliffCachedFragmentsTest < Redmine::ControllerTest
     assert_response :success
     assert_includes response.body, 'cached-mail-subject'
     assert_not_includes response.body, 'old header'
-    assert_equal 'cliff:converter-fixes-v2:normal', File.read("#{cache_dir}.converter")
+    assert_equal 'cliff:converter-fixes-v3:normal', File.read("#{cache_dir}.converter")
   end
 
   # port of curecodejp 6ce4793 (#64), as guards: ours had both since round 8

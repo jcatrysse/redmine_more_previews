@@ -158,7 +158,7 @@ class ConversionDebugRedactionTest < ActiveSupport::TestCase
     File.write("#{File.dirname(@target)}.converter", 'pass:libre-sandbox-v1:normal')
 
     assert_equal 'source data', pass_worker.preview(File.new(@source))
-    assert_equal 'pass:converter-fixes-v2:normal', File.read("#{File.dirname(@target)}.converter")
+    assert_equal 'pass:converter-fixes-v3:normal', File.read("#{File.dirname(@target)}.converter")
   end
 
   # round 8 (curecodejp 6.1.5, d6a2029): a preview stored with the marker of
@@ -169,7 +169,18 @@ class ConversionDebugRedactionTest < ActiveSupport::TestCase
     File.write("#{File.dirname(@target)}.converter", 'pass:converter-fixes-v1:normal')
 
     assert_equal 'source data', pass_worker.preview(File.new(@source))
-    assert_equal 'pass:converter-fixes-v2:normal', File.read("#{File.dirname(@target)}.converter")
+    assert_equal 'pass:converter-fixes-v3:normal', File.read("#{File.dirname(@target)}.converter")
+  end
+
+  # round 10 (curecodejp 3b8a5ea, 194c0b4): a preview stored with the marker of
+  # round 8 is converted again (Cliff's charsets, embedded images)
+  def test_cached_output_from_round_8_is_rebuilt
+    FileUtils.mkdir_p(File.dirname(@target))
+    File.write(@target, 'STALE ROUND 8 PREVIEW')
+    File.write("#{File.dirname(@target)}.converter", 'pass:converter-fixes-v2:normal')
+
+    assert_equal 'source data', pass_worker.preview(File.new(@source))
+    assert_equal 'pass:converter-fixes-v3:normal', File.read("#{File.dirname(@target)}.converter")
   end
 
   def test_switching_debug_mode_regenerates_the_cached_preview
