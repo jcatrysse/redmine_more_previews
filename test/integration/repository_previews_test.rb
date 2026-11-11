@@ -178,6 +178,29 @@ class RepositoryPreviewsTest < Redmine::IntegrationTest
     end
   end
 
+  # ours: the converter of a repository entry is chosen by its content, as the
+  # conversion does: html named evil.zip is served by Pass, without Zippy's top
+  # navigation or its charset (decided by the name, it got both)
+  def test_html_named_like_an_archive_gets_no_top_navigation
+    File.write(File.join(@dir, 'evil.zip'), '<html><body><a href="https://example.test/">click</a></body></html>')
+    system('git', '-C', @dir, 'add', 'evil.zip', exception: true, out: File::NULL, err: File::NULL)
+    system('git', '-C', @dir, '-c', 'user.name=Test', '-c', 'user.email=test@example.net', 'commit', '-q', '-m', 'evil',
+           exception: true, out: File::NULL, err: File::NULL)
+    @repository.fetch_changesets
+    with_converters(CONVERTERS.merge(:pass => { :html => :html })) do
+      log_user('jsmith', 'jsmith')
+      get '/projects/ecookbook/repository/samples/preview/evil.zip@/index.html'
+      assert_response :success
+      assert_includes response.body, 'click'
+      assert_equal 'sandbox allow-downloads allow-popups allow-popups-to-escape-sandbox', response.headers['Content-Security-Policy']
+      assert_equal 'text/html', response.headers['Content-Type']
+      # a real archive still gets both
+      get '/projects/ecookbook/repository/samples/preview/sample.zip@/index.html'
+      assert_includes response.headers['Content-Security-Policy'], 'allow-top-navigation-by-user-activation'
+      assert_equal 'text/html; charset=utf-8', response.headers['Content-Type']
+    end
+  end
+
   def test_more_preview_returns_the_conversion
     with_converters(CONVERTERS) do
       log_user('jsmith', 'jsmith')

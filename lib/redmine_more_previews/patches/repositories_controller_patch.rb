@@ -95,14 +95,38 @@ module RedmineMorePreviews
             render_404 unless @repository.project.module_enabled?('redmine_more_previews')
           end #def
           private :ensure_more_previews_module_enabled
+          
+          # the id of the converter of an html preview of the entry, chosen by its
+          # content as the conversion does (Converter.mime on the file
+          # Repository#more_preview writes): a file named .zip that holds html is
+          # not Zippy's listing, and gets neither its top navigation nor its
+          # charset. Read only for an entry whose name is one of a converter that
+          # writes its html itself (ControllerHelper::UTF8_PREVIEW_CONVERTERS);
+          # nil otherwise, and for an entry beyond the size limit, which the
+          # conversion refuses (ours, after curecodejp 966c49d, ee6c728)
+          def entry_converter_for_preview
+            name = File.basename((@entry&.name || @path).to_s)
+            return nil unless plugin_html_preview?(name, { :pathonly => true })
+            return nil if @repository.preview_too_large?(@path, @rev)
+            Dir.mktmpdir('rmp-entry') do |dir|
+              path = File.join(dir, name)
+              # the start is enough for the content types Marcel tells apart
+              File.binwrite(path, @repository.cat(@path, @rev).to_s.byteslice(0, 64 * 1024))
+              RedmineMorePreviews::Converter.responsible(path)&.id&.to_s
+            end
+          end #def
+          private :entry_converter_for_preview
 
           def send_more_preview
+            # the converter is chosen by the entry's content, as the conversion
+            # does (see entry_head_for_preview): a file named .zip that holds
+            # html is not Zippy's listing
+            converter     = entry_converter_for_preview
             sandbox_preview Rack::Mime.mime_type(".#{params[:format]}"),
-                            :top_navigation => plugin_html_preview?(@entry&.name || @path, { :pathonly => true },
-                              RedmineMorePreviews::ControllerHelper::TOP_NAVIGATION_PREVIEW_CONVERTERS)
+                            :top_navigation => RedmineMorePreviews::ControllerHelper::TOP_NAVIGATION_PREVIEW_CONVERTERS.include?(converter)
             download_name = preview_download_filename(@entry&.name || @path, @repository.preview_filename(@path, @rev, preview_params))
-            # by the entry's name: its content is read by the conversion only
-            preview_type  = preview_content_type(@entry&.name || @path, :pathonly => true)
+            preview_type  = Rack::Mime.mime_type(".#{params[:format]}")
+            preview_type += "; charset=utf-8" if RedmineMorePreviews::ControllerHelper::UTF8_PREVIEW_CONVERTERS.include?(converter)
             if !preview_unsafe? && RedmineMorePreviews::Converter.cache_previews?
               # the name of a PDF is part of the response (see AttachmentsControllerPatch)
               etag = preview_etag(@repository.preview_mtime(@path, @rev, preview_params))
